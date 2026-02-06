@@ -26,32 +26,32 @@ type KeyMap struct {
 func DefaultKeyMap() KeyMap {
 	return KeyMap{
 		SplitVertical: key.NewBinding(
-			key.WithKeys("ctrl+\\"),
-			key.WithHelp("ctrl+\\", "split vertical"),
+			key.WithKeys("alt+v"),
+			key.WithHelp("alt+v", "split vertical"),
 		),
 		SplitHorizontal: key.NewBinding(
-			key.WithKeys("ctrl+-"),
-			key.WithHelp("ctrl+-", "split horizontal"),
+			key.WithKeys("alt+h"),
+			key.WithHelp("alt+h", "split horizontal"),
 		),
 		Close: key.NewBinding(
-			key.WithKeys("ctrl+w"),
-			key.WithHelp("ctrl+w", "close pane"),
+			key.WithKeys("alt+w"),
+			key.WithHelp("alt+w", "close pane"),
 		),
 		FocusLeft: key.NewBinding(
-			key.WithKeys("ctrl+h"),
-			key.WithHelp("ctrl+h", "focus left"),
+			key.WithKeys("alt+left"),
+			key.WithHelp("alt+left", "focus left"),
 		),
 		FocusDown: key.NewBinding(
-			key.WithKeys("ctrl+j"),
-			key.WithHelp("ctrl+j", "focus down"),
+			key.WithKeys("alt+down"),
+			key.WithHelp("alt+down", "focus down"),
 		),
 		FocusUp: key.NewBinding(
-			key.WithKeys("ctrl+k"),
-			key.WithHelp("ctrl+k", "focus up"),
+			key.WithKeys("alt+up"),
+			key.WithHelp("alt+up", "focus up"),
 		),
 		FocusRight: key.NewBinding(
-			key.WithKeys("ctrl+l"),
-			key.WithHelp("ctrl+l", "focus right"),
+			key.WithKeys("alt+right"),
+			key.WithHelp("alt+right", "focus right"),
 		),
 		FocusCycle: key.NewBinding(
 			key.WithKeys("tab"),

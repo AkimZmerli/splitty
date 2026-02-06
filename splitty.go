@@ -430,10 +430,10 @@ func (m *Manager) renderStatusBar() string {
 	}
 
 	var parts []string
-	parts = append(parts, "Ctrl+\\ split")
-	parts = append(parts, "Ctrl+- hsplit")
-	parts = append(parts, "Ctrl+w close")
-	parts = append(parts, "Ctrl+hjkl nav")
+	parts = append(parts, "Alt+v split")
+	parts = append(parts, "Alt+h hsplit")
+	parts = append(parts, "Alt+w close")
+	parts = append(parts, "Alt+arrows nav")
 
 	if m.zoomed {
 		parts = append(parts, m.theme.ZoomIndicator)
