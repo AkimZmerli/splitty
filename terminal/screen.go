@@ -4,6 +4,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"unicode"
+	"unicode/utf8"
 )
 
 type parseState int
@@ -34,6 +36,9 @@ type Screen struct {
 	paramBuf []byte
 	oscBuf   []byte
 	private  bool
+
+	// UTF-8 multi-byte accumulator
+	utfBuf []byte
 }
 
 // NewScreen creates a new screen with the given dimensions.
@@ -47,6 +52,7 @@ func NewScreen(width, height int) *Screen {
 		state:        stateGround,
 		paramBuf:     make([]byte, 0, 64),
 		oscBuf:       make([]byte, 0, 256),
+		utfBuf:       make([]byte, 0, 4),
 	}
 	s.cells = s.newGrid(width, height)
 	return s
@@ -147,27 +153,85 @@ func (s *Screen) processByte(b byte) {
 	}
 }
 
+func (s *Screen) flushUtfBuf() {
+	for range s.utfBuf {
+		s.writeRune(unicode.ReplacementChar)
+	}
+	s.utfBuf = s.utfBuf[:0]
+}
+
 func (s *Screen) processGround(b byte) {
+	// Handle control characters — flush any pending UTF-8 first
 	switch {
 	case b == 0x1b: // ESC
+		s.flushUtfBuf()
 		s.state = stateEscape
+		return
 	case b == '\n': // LF
+		s.flushUtfBuf()
 		s.lineFeed()
+		return
 	case b == '\r': // CR
+		s.flushUtfBuf()
 		s.cursor.Col = 0
+		return
 	case b == '\b': // BS
+		s.flushUtfBuf()
 		if s.cursor.Col > 0 {
 			s.cursor.Col--
 		}
+		return
 	case b == '\t': // TAB
+		s.flushUtfBuf()
 		s.cursor.Col = (s.cursor.Col/8 + 1) * 8
 		if s.cursor.Col >= s.width {
 			s.cursor.Col = s.width - 1
 		}
+		return
 	case b == 0x07: // BEL
-		// ignore
-	case b >= 0x20: // printable
+		s.flushUtfBuf()
+		return
+	case b < 0x20: // other C0 controls
+		s.flushUtfBuf()
+		return
+	}
+
+	// Printable bytes — handle UTF-8 decoding
+	switch {
+	case b < 0x80:
+		// ASCII fast path
+		s.flushUtfBuf()
 		s.writeRune(rune(b))
+
+	case b >= 0xC0 && b <= 0xF7:
+		// Leading byte of a multi-byte sequence
+		s.flushUtfBuf()
+		s.utfBuf = append(s.utfBuf, b)
+
+	case b >= 0x80 && b < 0xC0:
+		// Continuation byte
+		if len(s.utfBuf) == 0 {
+			// Orphan continuation byte
+			s.writeRune(unicode.ReplacementChar)
+			return
+		}
+		s.utfBuf = append(s.utfBuf, b)
+		if utf8.FullRune(s.utfBuf) {
+			r, size := utf8.DecodeRune(s.utfBuf)
+			if r == utf8.RuneError && size <= 1 {
+				r = unicode.ReplacementChar
+			}
+			s.writeRune(r)
+			s.utfBuf = s.utfBuf[:0]
+		} else if len(s.utfBuf) >= 4 {
+			// Too many bytes without completing — flush as errors
+			s.flushUtfBuf()
+		}
+
+	default:
+		// Invalid byte (0xF8-0xFF)
+		s.flushUtfBuf()
+		s.writeRune(unicode.ReplacementChar)
 	}
 }
 
@@ -671,6 +735,7 @@ func (s *Screen) fullReset() {
 	s.scrollTop = 0
 	s.scrollBottom = s.height - 1
 	s.title = ""
+	s.utfBuf = s.utfBuf[:0]
 }
 
 // Render converts the cell grid to an ANSI string suitable for display
@@ -691,9 +756,13 @@ func (s *Screen) Render() string {
 		}
 		for col := 0; col < s.width; col++ {
 			cell := s.cells[row][col]
-			if first || !cell.Style.Equal(prevStyle) {
-				buf.WriteString(cell.Style.ToANSI())
-				prevStyle = cell.Style
+			renderStyle := cell.Style
+			if s.cursor.Visible && row == s.cursor.Row && col == s.cursor.Col {
+				renderStyle.Reverse = !renderStyle.Reverse
+			}
+			if first || !renderStyle.Equal(prevStyle) {
+				buf.WriteString(renderStyle.ToANSI())
+				prevStyle = renderStyle
 				first = false
 			}
 			if cell.Rune == 0 {

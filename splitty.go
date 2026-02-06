@@ -39,6 +39,9 @@ type Manager struct {
 	broadcasting bool
 	ready        bool
 
+	// Context menu
+	menu contextMenu
+
 	// Runtime
 	log *logger
 }
@@ -61,6 +64,7 @@ func New(opts ...Option) *Manager {
 		minHeight: 3,
 		statusBar: true,
 		mouse:     true,
+		menu:      newContextMenu(),
 	}
 
 	for _, opt := range opts {
@@ -117,7 +121,11 @@ func (m *Manager) View() string {
 
 	if m.statusBar {
 		bar := m.renderStatusBar()
-		return lipgloss.JoinVertical(lipgloss.Left, content, bar)
+		content = lipgloss.JoinVertical(lipgloss.Left, content, bar)
+	}
+
+	if m.menu.visible {
+		content = m.menu.overlayOnView(content, m.width, m.height, m.theme)
 	}
 
 	return content
@@ -133,6 +141,7 @@ func (m *Manager) statusBarHeight() int {
 func (m *Manager) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	m.width = msg.Width
 	m.height = msg.Height
+	m.menu.hide()
 
 	if !m.ready {
 		m.ready = true
@@ -141,6 +150,26 @@ func (m *Manager) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 
 	// Recalculate layout
 	m.layoutAll()
+	return m, nil
+}
+
+// executeMenuAction dispatches the currently selected menu action.
+func (m *Manager) executeMenuAction() (tea.Model, tea.Cmd) {
+	action := m.menu.selectedAction()
+	targetID := m.menu.paneID
+	m.menu.hide()
+
+	// Focus the target pane before acting on it
+	m.focusedID = targetID
+
+	switch action {
+	case actionSplitVertical:
+		return m.Split(Vertical)
+	case actionSplitHorizontal:
+		return m.Split(Horizontal)
+	case actionClosePane:
+		return m.ClosePane(targetID)
+	}
 	return m, nil
 }
 
@@ -178,6 +207,26 @@ func (m *Manager) initLayout() (tea.Model, tea.Cmd) {
 }
 
 func (m *Manager) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Intercept keys when context menu is visible
+	if m.menu.visible {
+		switch msg.Type {
+		case tea.KeyEscape:
+			m.menu.hide()
+			return m, nil
+		case tea.KeyUp:
+			m.menu.moveUp()
+			return m, nil
+		case tea.KeyDown:
+			m.menu.moveDown()
+			return m, nil
+		case tea.KeyEnter:
+			return m.executeMenuAction()
+		default:
+			m.menu.hide()
+			return m, nil
+		}
+	}
+
 	switch {
 	case key.Matches(msg, m.keyMap.SplitVertical):
 		return m.Split(Vertical)
@@ -222,7 +271,48 @@ func (m *Manager) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Manager) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
-	// Click to focus: find which pane was clicked
+	// Context menu interactions
+	if m.menu.visible {
+		contentH := m.statusBarHeight()
+		switch {
+		case msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft:
+			if m.menu.hitTest(msg.X, msg.Y, m.width, contentH) {
+				idx := m.menu.hitTestItem(msg.X, msg.Y, m.width, contentH)
+				if idx >= 0 {
+					m.menu.selected = idx
+					return m.executeMenuAction()
+				}
+				return m, nil
+			}
+			// Click outside — dismiss menu
+			m.menu.hide()
+			return m, nil
+
+		case msg.Action == tea.MouseActionMotion:
+			idx := m.menu.hitTestItem(msg.X, msg.Y, m.width, contentH)
+			if idx >= 0 {
+				m.menu.selected = idx
+			}
+			return m, nil
+		}
+		return m, nil
+	}
+
+	// Right-click: show context menu (not while zoomed)
+	if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonRight && !m.zoomed {
+		leaves := m.root.leaves()
+		for _, leaf := range leaves {
+			p := leaf.pane
+			if msg.X >= p.X && msg.X < p.X+p.Width &&
+				msg.Y >= p.Y && msg.Y < p.Y+p.Height {
+				m.focusedID = p.ID
+				m.menu.show(msg.X, msg.Y, p.ID)
+				return m, nil
+			}
+		}
+	}
+
+	// Left-click to focus: find which pane was clicked
 	if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft {
 		leaves := m.root.leaves()
 		for _, leaf := range leaves {
