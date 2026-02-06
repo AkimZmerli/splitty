@@ -25,20 +25,22 @@ type Pane struct {
 	Width  int
 	Height int
 
-	screen *terminal.Screen
-	pty    *terminal.PTY
-	closed bool
+	screen     *terminal.Screen
+	pty        *terminal.PTY
+	closed     bool
+	autoScroll bool // Auto-scroll to bottom on new output
 }
 
-func newPane(shell string, env []string, width, height int) *Pane {
+func newPane(shell string, env []string, width, height int, scrollbackSize int) *Pane {
 	cwd, _ := os.Getwd()
 	return &Pane{
-		ID:     nextPaneID(),
-		Title:  shell,
-		CWD:    cwd,
-		Width:  width,
-		Height: height,
-		screen: terminal.NewScreen(width, height),
+		ID:         nextPaneID(),
+		Title:      shell,
+		CWD:        cwd,
+		Width:      width,
+		Height:     height,
+		screen:     terminal.NewScreenWithScrollback(width, height, scrollbackSize),
+		autoScroll: true,
 	}
 }
 
@@ -86,4 +88,29 @@ func (p *Pane) close() {
 // render returns the pane's current screen content as an ANSI string.
 func (p *Pane) render() string {
 	return p.screen.Render()
+}
+
+// scrollUp scrolls the view backward into history.
+func (p *Pane) scrollUp(lines int) {
+	p.screen.ScrollViewUp(lines)
+	p.autoScroll = false
+}
+
+// scrollDown scrolls the view forward toward live output.
+func (p *Pane) scrollDown(lines int) {
+	offset := p.screen.ScrollViewDown(lines)
+	if offset == 0 {
+		p.autoScroll = true
+	}
+}
+
+// resetScroll jumps to the bottom and resumes auto-scroll.
+func (p *Pane) resetScroll() {
+	p.screen.ScrollViewDown(999999)
+	p.autoScroll = true
+}
+
+// isScrolledBack returns true if the pane is viewing history.
+func (p *Pane) isScrolledBack() bool {
+	return p.screen.IsScrolledBack()
 }

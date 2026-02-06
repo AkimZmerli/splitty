@@ -85,7 +85,7 @@ func TestDeserializeLeafNode(t *testing.T) {
 		Shell: "/bin/bash",
 	}
 
-	n := deserializeNode(data, "/bin/sh", nil)
+	n := deserializeNode(data, "/bin/bash", nil, 1000)
 	if n == nil {
 		t.Fatal("deserializeNode returned nil")
 	}
@@ -113,7 +113,7 @@ func TestDeserializeSplitNode(t *testing.T) {
 		Second:    &nodeData{Type: "leaf", Shell: "/bin/sh"},
 	}
 
-	n := deserializeNode(data, "/bin/sh", nil)
+	n := deserializeNode(data, "/bin/bash", nil, 1000)
 	if n == nil {
 		t.Fatal("deserializeNode returned nil")
 	}
@@ -141,7 +141,7 @@ func TestDeserializeHorizontalDirection(t *testing.T) {
 		Second:    &nodeData{Type: "leaf", Shell: "/bin/sh"},
 	}
 
-	n := deserializeNode(data, "/bin/sh", nil)
+	n := deserializeNode(data, "/bin/bash", nil, 1000)
 	sn := n.(*splitNode)
 	if sn.dir != Horizontal {
 		t.Errorf("expected Horizontal direction")
@@ -149,7 +149,7 @@ func TestDeserializeHorizontalDirection(t *testing.T) {
 }
 
 func TestDeserializeNilData(t *testing.T) {
-	n := deserializeNode(nil, "/bin/sh", nil)
+	n := deserializeNode(nil, "/bin/bash", nil, 1000)
 	if n != nil {
 		t.Error("expected nil for nil data")
 	}
@@ -164,7 +164,7 @@ func TestDeserializeMissingChild(t *testing.T) {
 		Second:    nil,
 	}
 
-	n := deserializeNode(data, "/bin/sh", nil)
+	n := deserializeNode(data, "/bin/bash", nil, 1000)
 	// When second child is nil, should return first
 	if n == nil {
 		t.Fatal("should return the non-nil child")
@@ -177,7 +177,7 @@ func TestDeserializeMissingChild(t *testing.T) {
 
 func TestDeserializeUnknownType(t *testing.T) {
 	data := &nodeData{Type: "unknown"}
-	n := deserializeNode(data, "/bin/sh", nil)
+	n := deserializeNode(data, "/bin/bash", nil, 1000)
 	if n != nil {
 		t.Error("expected nil for unknown type")
 	}
@@ -198,7 +198,7 @@ func TestSerializeDeserializeRoundtrip(t *testing.T) {
 		t.Fatalf("unmarshal error: %v", err)
 	}
 
-	n := deserializeNode(&decoded, "/bin/bash", nil)
+	n := deserializeNode(data, "/bin/bash", nil, 1000)
 	if n == nil {
 		t.Fatal("deserialized node is nil")
 	}
@@ -217,7 +217,7 @@ func TestDeserializeUsesShellFallback(t *testing.T) {
 		Shell: "", // empty shell should use the fallback
 	}
 
-	n := deserializeNode(data, "/bin/zsh", nil)
+	n := deserializeNode(data, "/bin/bash", nil, 1000)
 	leaf := n.(*leafNode)
 	// newPane is called with the fallback shell
 	if leaf.pane == nil {

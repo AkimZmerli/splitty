@@ -20,6 +20,12 @@ type KeyMap struct {
 	ResizeUp        key.Binding
 	ResizeDown      key.Binding
 	Broadcast       key.Binding
+	ScrollUp        key.Binding
+	ScrollDown      key.Binding
+	ScrollPageUp    key.Binding
+	ScrollPageDown  key.Binding
+	ScrollToTop     key.Binding
+	ScrollToBottom  key.Binding
 }
 
 // DefaultKeyMap returns the default keybindings for split pane operations.
@@ -88,6 +94,30 @@ func DefaultKeyMap() KeyMap {
 		Broadcast: key.NewBinding(
 			key.WithKeys("ctrl+b"),
 			key.WithHelp("ctrl+b", "toggle broadcast"),
+		),
+		ScrollUp: key.NewBinding(
+			key.WithKeys("ctrl+k"),
+			key.WithHelp("ctrl+k", "scroll up"),
+		),
+		ScrollDown: key.NewBinding(
+			key.WithKeys("ctrl+j"),
+			key.WithHelp("ctrl+j", "scroll down"),
+		),
+		ScrollPageUp: key.NewBinding(
+			key.WithKeys("ctrl+u"),
+			key.WithHelp("ctrl+u", "page up"),
+		),
+		ScrollPageDown: key.NewBinding(
+			key.WithKeys("ctrl+n"),
+			key.WithHelp("ctrl+n", "page down"),
+		),
+		ScrollToTop: key.NewBinding(
+			key.WithKeys("ctrl+home"),
+			key.WithHelp("ctrl+home", "scroll to top"),
+		),
+		ScrollToBottom: key.NewBinding(
+			key.WithKeys("ctrl+end"),
+			key.WithHelp("ctrl+end", "scroll to bottom"),
 		),
 	}
 }

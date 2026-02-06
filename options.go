@@ -76,3 +76,11 @@ func WithLogger(l *log.Logger) Option {
 		m.log = newLogger(l)
 	}
 }
+
+// WithScrollbackLines sets the maximum scrollback history per pane.
+// Default: 1000 lines. Set to 0 to disable scrollback.
+func WithScrollbackLines(lines int) Option {
+	return func(m *Manager) {
+		m.scrollbackLines = lines
+	}
+}

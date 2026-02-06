@@ -22,15 +22,16 @@ type Manager struct {
 	height int
 
 	// Configuration
-	shell      string
-	env        []string
-	theme      Theme
-	keyMap     KeyMap
-	minWidth   int
-	minHeight  int
-	statusBar  bool
-	mouse      bool
-	presetName string
+	shell           string
+	env             []string
+	theme           Theme
+	keyMap          KeyMap
+	minWidth        int
+	minHeight       int
+	statusBar       bool
+	mouse           bool
+	presetName      string
+	scrollbackLines int
 
 	// State
 	zoomed       bool
@@ -57,14 +58,15 @@ func New(opts ...Option) *Manager {
 	}
 
 	m := &Manager{
-		shell:     shell,
-		theme:     DefaultTheme,
-		keyMap:    DefaultKeyMap(),
-		minWidth:  10,
-		minHeight: 3,
-		statusBar: true,
-		mouse:     true,
-		menu:      newContextMenu(),
+		shell:           shell,
+		theme:           DefaultTheme,
+		keyMap:          DefaultKeyMap(),
+		minWidth:        10,
+		minHeight:       3,
+		statusBar:       true,
+		mouse:           true,
+		scrollbackLines: 1000,
+		menu:            newContextMenu(),
 	}
 
 	for _, opt := range opts {
@@ -178,12 +180,12 @@ func (m *Manager) initLayout() (tea.Model, tea.Cmd) {
 
 	if m.presetName != "" {
 		if builder, ok := presetRegistry[m.presetName]; ok {
-			m.root = builder(m.shell, m.env, m.width, h)
+			m.root = builder(m.shell, m.env, m.width, h, m.scrollbackLines)
 		}
 	}
 
 	if m.root == nil {
-		pane := newPane(m.shell, m.env, m.width, h)
+		pane := newPane(m.shell, m.env, m.width, h, m.scrollbackLines)
 		m.root = &leafNode{pane: pane}
 	}
 
@@ -260,6 +262,30 @@ func (m *Manager) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.Resize(Horizontal, -0.05)
 	case key.Matches(msg, m.keyMap.ResizeDown):
 		m.Resize(Horizontal, 0.05)
+	case key.Matches(msg, m.keyMap.ScrollUp):
+		if p := m.findPane(m.focusedID); p != nil {
+			p.scrollUp(1)
+		}
+	case key.Matches(msg, m.keyMap.ScrollDown):
+		if p := m.findPane(m.focusedID); p != nil {
+			p.scrollDown(1)
+		}
+	case key.Matches(msg, m.keyMap.ScrollPageUp):
+		if p := m.findPane(m.focusedID); p != nil {
+			p.scrollUp(p.Height / 2)
+		}
+	case key.Matches(msg, m.keyMap.ScrollPageDown):
+		if p := m.findPane(m.focusedID); p != nil {
+			p.scrollDown(p.Height / 2)
+		}
+	case key.Matches(msg, m.keyMap.ScrollToTop):
+		if p := m.findPane(m.focusedID); p != nil {
+			p.scrollUp(999999)
+		}
+	case key.Matches(msg, m.keyMap.ScrollToBottom):
+		if p := m.findPane(m.focusedID); p != nil {
+			p.resetScroll()
+		}
 	default:
 		// Forward keystrokes to pane(s)
 		data := keyToBytes(msg)
@@ -294,6 +320,24 @@ func (m *Manager) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				m.menu.selected = idx
 			}
 			return m, nil
+		}
+		return m, nil
+	}
+
+	// Mouse wheel scrolling
+	if msg.Action == tea.MouseActionPress && (msg.Button == tea.MouseButtonWheelUp || msg.Button == tea.MouseButtonWheelDown) {
+		leaves := m.root.leaves()
+		for _, leaf := range leaves {
+			p := leaf.pane
+			if msg.X >= p.X && msg.X < p.X+p.Width &&
+				msg.Y >= p.Y && msg.Y < p.Y+p.Height {
+				if msg.Button == tea.MouseButtonWheelUp {
+					p.scrollUp(3)
+				} else {
+					p.scrollDown(3)
+				}
+				return m, nil
+			}
 		}
 		return m, nil
 	}
@@ -369,10 +413,23 @@ func (m *Manager) renderNode(n node, width, height int) string {
 
 func (m *Manager) renderPane(p *Pane, width, height int) string {
 	content := p.render()
-	style := m.theme.BorderInactive
-	if p.ID == m.focusedID {
-		style = m.theme.BorderActive
+	var style lipgloss.Style
+
+	// Determine border style based on scrollback state
+	if p.isScrolledBack() {
+		if p.ID == m.focusedID {
+			style = m.theme.BorderScrollbackFocused
+		} else {
+			style = m.theme.BorderScrollback
+		}
+	} else {
+		if p.ID == m.focusedID {
+			style = m.theme.BorderActive
+		} else {
+			style = m.theme.BorderInactive
+		}
 	}
+
 	return style.
 		Width(width - 2).  // account for border
 		Height(height - 2). // account for border

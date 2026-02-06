@@ -31,6 +31,13 @@ type Screen struct {
 	scrollBottom int
 	title        string
 
+	// Scrollback buffer (ring buffer)
+	scrollback     [][]Cell  // Ring buffer storage
+	scrollbackSize int       // Max lines (configurable)
+	scrollbackHead int       // Next write position
+	scrollbackLen  int       // Current filled lines
+	viewOffset     int       // Lines scrolled back (0 = live)
+
 	// Parser state machine
 	state    parseState
 	paramBuf []byte
@@ -45,20 +52,30 @@ type Screen struct {
 	wrapPending bool
 }
 
-// NewScreen creates a new screen with the given dimensions.
+// NewScreen creates a new screen with the given dimensions and default scrollback (1000 lines).
 func NewScreen(width, height int) *Screen {
+	return NewScreenWithScrollback(width, height, 1000)
+}
+
+// NewScreenWithScrollback creates a new screen with the given dimensions and scrollback size.
+// Set scrollbackSize to 0 to disable scrollback.
+func NewScreenWithScrollback(width, height, scrollbackSize int) *Screen {
 	s := &Screen{
-		width:        width,
-		height:       height,
-		cursor:       DefaultCursor(),
-		scrollTop:    0,
-		scrollBottom: height - 1,
-		state:        stateGround,
-		paramBuf:     make([]byte, 0, 64),
-		oscBuf:       make([]byte, 0, 256),
-		utfBuf:       make([]byte, 0, 4),
+		width:          width,
+		height:         height,
+		cursor:         DefaultCursor(),
+		scrollTop:      0,
+		scrollBottom:   height - 1,
+		scrollbackSize: scrollbackSize,
+		state:          stateGround,
+		paramBuf:       make([]byte, 0, 64),
+		oscBuf:         make([]byte, 0, 256),
+		utfBuf:         make([]byte, 0, 4),
 	}
 	s.cells = s.newGrid(width, height)
+	if scrollbackSize > 0 {
+		s.scrollback = make([][]Cell, scrollbackSize)
+	}
 	return s
 }
 
@@ -587,6 +604,17 @@ func (s *Screen) reverseIndex() {
 
 func (s *Screen) scrollUp(n int) {
 	for i := 0; i < n; i++ {
+		// Save the line being scrolled off to the scrollback buffer
+		if s.scrollbackSize > 0 && s.scrollTop == 0 {
+			topLine := s.copyLine(s.cells[0])
+			s.scrollback[s.scrollbackHead] = topLine
+			s.scrollbackHead = (s.scrollbackHead + 1) % s.scrollbackSize
+			if s.scrollbackLen < s.scrollbackSize {
+				s.scrollbackLen++
+			}
+		}
+
+		// Scroll visible region
 		for row := s.scrollTop; row < s.scrollBottom; row++ {
 			s.cells[row] = s.cells[row+1]
 		}
@@ -745,6 +773,44 @@ func (s *Screen) clearScreen() {
 	s.wrapPending = false
 }
 
+// copyLine deep copies a line of cells.
+func (s *Screen) copyLine(line []Cell) []Cell {
+	copied := make([]Cell, len(line))
+	copy(copied, line)
+	return copied
+}
+
+// ScrollViewUp scrolls the view backward (into history).
+// Returns the new view offset.
+func (s *Screen) ScrollViewUp(lines int) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.viewOffset += lines
+	if s.viewOffset > s.scrollbackLen {
+		s.viewOffset = s.scrollbackLen
+	}
+	return s.viewOffset
+}
+
+// ScrollViewDown scrolls the view forward (toward live output).
+// Returns the new view offset.
+func (s *Screen) ScrollViewDown(lines int) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.viewOffset -= lines
+	if s.viewOffset < 0 {
+		s.viewOffset = 0
+	}
+	return s.viewOffset
+}
+
+// IsScrolledBack returns true if viewing history (not at live output).
+func (s *Screen) IsScrolledBack() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.viewOffset > 0
+}
+
 func (s *Screen) fullReset() {
 	s.clearScreen()
 	s.cursor = DefaultCursor()
@@ -772,9 +838,38 @@ func (s *Screen) Render() string {
 			buf.WriteByte('\n')
 		}
 		for col := 0; col < s.width; col++ {
-			cell := s.cells[row][col]
+			var cell Cell
+
+			// Determine which cell to render based on viewOffset
+			if s.viewOffset > 0 && s.scrollbackLen > 0 {
+				// Show scrollback lines that correspond to this row
+				// We show the oldest viewOffset lines from scrollback
+				linesFromTop := s.viewOffset
+				oldestIdx := (s.scrollbackHead - s.scrollbackLen) % s.scrollbackSize
+				if oldestIdx < 0 {
+					oldestIdx += s.scrollbackSize
+				}
+
+				// For each row, determine if it comes from scrollback or current cells
+				if row < linesFromTop && row < s.scrollbackLen {
+					// This row is within the scrollback view
+					sbIdx := (oldestIdx + row) % s.scrollbackSize
+					if s.scrollback[sbIdx] != nil && col < len(s.scrollback[sbIdx]) {
+						cell = s.scrollback[sbIdx][col]
+					} else {
+						cell = EmptyCell()
+					}
+				} else {
+					// Show current cells
+					cell = s.cells[row][col]
+				}
+			} else {
+				// Normal rendering from cells
+				cell = s.cells[row][col]
+			}
+
 			renderStyle := cell.Style
-			if s.cursor.Visible && row == s.cursor.Row && col == s.cursor.Col {
+			if s.cursor.Visible && s.viewOffset == 0 && row == s.cursor.Row && col == s.cursor.Col {
 				renderStyle.Reverse = !renderStyle.Reverse
 			}
 			if first || !renderStyle.Equal(prevStyle) {

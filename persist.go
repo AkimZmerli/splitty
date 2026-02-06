@@ -59,7 +59,7 @@ func (m *Manager) LoadLayout(path string) error {
 		return nil
 	}
 
-	newRoot := deserializeNode(data.Tree, m.shell, m.env)
+	newRoot := deserializeNode(data.Tree, m.shell, m.env, m.scrollbackLines)
 	if newRoot == nil {
 		return nil
 	}
@@ -108,7 +108,7 @@ func serializeNode(n node, shell string) *nodeData {
 	return nil
 }
 
-func deserializeNode(data *nodeData, shell string, env []string) node {
+func deserializeNode(data *nodeData, shell string, env []string, scrollbackSize int) node {
 	if data == nil {
 		return nil
 	}
@@ -119,7 +119,7 @@ func deserializeNode(data *nodeData, shell string, env []string) node {
 		if data.Shell != "" {
 			s = data.Shell
 		}
-		p := newPane(s, env, 80, 24) // dimensions will be recalculated by layoutAll
+		p := newPane(s, env, 80, 24, scrollbackSize) // dimensions will be recalculated by layoutAll
 		if data.CWD != "" {
 			p.CWD = data.CWD
 		}
@@ -133,8 +133,8 @@ func deserializeNode(data *nodeData, shell string, env []string) node {
 		if data.Direction == "horizontal" {
 			dir = Horizontal
 		}
-		first := deserializeNode(data.First, shell, env)
-		second := deserializeNode(data.Second, shell, env)
+		first := deserializeNode(data.First, shell, env, scrollbackSize)
+		second := deserializeNode(data.Second, shell, env, scrollbackSize)
 		if first == nil || second == nil {
 			return first // or second, whichever is non-nil
 		}

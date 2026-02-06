@@ -24,7 +24,7 @@ func (m *Manager) Split(dir Direction) (tea.Model, tea.Cmd) {
 	}
 
 	// Create new pane
-	newP := newPane(m.shell, m.env, focused.Width/2, focused.Height/2)
+	newP := newPane(m.shell, m.env, focused.Width/2, focused.Height/2, m.scrollbackLines)
 
 	newLeaf := &leafNode{pane: newP}
 	oldLeaf := &leafNode{pane: focused}
