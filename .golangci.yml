@@ -11,10 +11,11 @@ issues:
     - path: _test\.go
       linters:
         - unused
-    # Exclude gocritic unnamedResult in test helpers
-    - path: helpers_test\.go
+    # Exclude gocritic commentedOutCode in cell_test.go (existing commented examples)
+    - path: cell_test\.go
       linters:
         - gocritic
+      text: "commentedOutCode"
 
 linters:
   enable:
