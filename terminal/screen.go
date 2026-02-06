@@ -39,6 +39,10 @@ type Screen struct {
 
 	// UTF-8 multi-byte accumulator
 	utfBuf []byte
+
+	// Pending wrap: cursor hit right margin but hasn't wrapped yet.
+	// Next printable char will wrap; CR/LF/cursor-move will clear it.
+	wrapPending bool
 }
 
 // NewScreen creates a new screen with the given dimensions.
@@ -165,24 +169,29 @@ func (s *Screen) processGround(b byte) {
 	switch {
 	case b == 0x1b: // ESC
 		s.flushUtfBuf()
+		s.wrapPending = false
 		s.state = stateEscape
 		return
 	case b == '\n': // LF
 		s.flushUtfBuf()
+		s.wrapPending = false
 		s.lineFeed()
 		return
 	case b == '\r': // CR
 		s.flushUtfBuf()
+		s.wrapPending = false
 		s.cursor.Col = 0
 		return
 	case b == '\b': // BS
 		s.flushUtfBuf()
+		s.wrapPending = false
 		if s.cursor.Col > 0 {
 			s.cursor.Col--
 		}
 		return
 	case b == '\t': // TAB
 		s.flushUtfBuf()
+		s.wrapPending = false
 		s.cursor.Col = (s.cursor.Col/8 + 1) * 8
 		if s.cursor.Col >= s.width {
 			s.cursor.Col = s.width - 1
@@ -324,6 +333,7 @@ func (s *Screen) paramDefault(idx, def int, params []int) int {
 }
 
 func (s *Screen) dispatchCSI(final byte) {
+	s.wrapPending = false
 	params := s.parseParams()
 
 	switch final {
@@ -540,6 +550,11 @@ func (s *Screen) handleDECReset(params []int) {
 // --- Terminal operations ---
 
 func (s *Screen) writeRune(r rune) {
+	if s.wrapPending {
+		s.cursor.Col = 0
+		s.lineFeed()
+		s.wrapPending = false
+	}
 	if s.cursor.Row >= 0 && s.cursor.Row < s.height &&
 		s.cursor.Col >= 0 && s.cursor.Col < s.width {
 		s.cells[s.cursor.Row][s.cursor.Col] = Cell{
@@ -549,8 +564,8 @@ func (s *Screen) writeRune(r rune) {
 	}
 	s.cursor.Col++
 	if s.cursor.Col >= s.width {
-		s.cursor.Col = 0
-		s.lineFeed()
+		s.cursor.Col = s.width - 1
+		s.wrapPending = true
 	}
 }
 
@@ -727,6 +742,7 @@ func (s *Screen) clearScreen() {
 	}
 	s.cursor.Row = 0
 	s.cursor.Col = 0
+	s.wrapPending = false
 }
 
 func (s *Screen) fullReset() {
@@ -736,6 +752,7 @@ func (s *Screen) fullReset() {
 	s.scrollBottom = s.height - 1
 	s.title = ""
 	s.utfBuf = s.utfBuf[:0]
+	s.wrapPending = false
 }
 
 // Render converts the cell grid to an ANSI string suitable for display
