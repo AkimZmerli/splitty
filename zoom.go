@@ -44,9 +44,11 @@ func (m *Manager) IsZoomed() bool {
 // toggleZoom toggles zoom on the focused pane.
 func (m *Manager) toggleZoom() (tea.Model, tea.Cmd) {
 	if m.zoomed {
-		return m, m.Unzoom()
+		cmd := m.Unzoom()
+		return m, cmd
 	}
-	return m, m.Zoom()
+	cmd := m.Zoom()
+	return m, cmd
 }
 
 // Swap exchanges the focused pane with its sibling in the tree.

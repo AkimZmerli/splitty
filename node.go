@@ -83,11 +83,6 @@ func (s *splitNode) sibling(child node) node {
 	return nil
 }
 
-// isFirst returns true if the given child is the first child.
-func (s *splitNode) isFirst(child node) bool {
-	return s.first == child
-}
-
 // findParent finds the parent splitNode of a node with the given leaf id.
 func findParent(root node, id string) (*splitNode, node) {
 	sn, ok := root.(*splitNode)

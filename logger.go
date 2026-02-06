@@ -27,12 +27,6 @@ func (lg *logger) info(msg string, keyvals ...interface{}) {
 	}
 }
 
-func (lg *logger) warn(msg string, keyvals ...interface{}) {
-	if lg != nil && lg.l != nil {
-		lg.l.Warn(msg, keyvals...)
-	}
-}
-
 func (lg *logger) error(msg string, keyvals ...interface{}) {
 	if lg != nil && lg.l != nil {
 		lg.l.Error(msg, keyvals...)

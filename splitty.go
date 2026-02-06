@@ -90,7 +90,8 @@ func (m *Manager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case PaneOutputMsg:
-		return m, m.readPaneCmd(msg.PaneID)
+		cmd := m.readPaneCmd(msg.PaneID)
+		return m, cmd
 
 	case PaneClosedMsg:
 		if msg.Err != nil {
@@ -249,7 +250,7 @@ func (m *Manager) readPaneCmd(paneID string) tea.Cmd {
 		if err != nil {
 			return PaneClosedMsg{PaneID: paneID, Err: err}
 		}
-		leaf.pane.screen.Write(buf[:n])
+		_, _ = leaf.pane.screen.Write(buf[:n])
 		return PaneOutputMsg{PaneID: paneID, Data: buf[:n]}
 	}
 }
