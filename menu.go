@@ -87,9 +87,9 @@ func (c *contextMenu) menuHeight() int {
 }
 
 // clampPosition adjusts the menu position to stay within screen bounds.
-func (c *contextMenu) clampPosition(screenW, screenH int) (int, int) {
-	x := c.x
-	y := c.y
+func (c *contextMenu) clampPosition(screenW, screenH int) (x, y int) {
+	x = c.x
+	y = c.y
 	mw := c.menuWidth()
 	mh := c.menuHeight()
 
@@ -105,7 +105,7 @@ func (c *contextMenu) clampPosition(screenW, screenH int) (int, int) {
 	if y < 0 {
 		y = 0
 	}
-	return x, y
+	return
 }
 
 // hitTest returns true if the given coordinates are inside the menu.

@@ -1,5 +1,22 @@
 run:
   timeout: 5m
+  skip-dirs:
+    - vendor
+
+issues:
+  exclude-rules:
+    # Exclude errcheck in test files (test utilities may not check all errors)
+    - path: _test\.go
+      linters:
+        - errcheck
+    # Exclude unused in test files (test helpers may not be used everywhere)
+    - path: _test\.go
+      linters:
+        - unused
+    # Exclude gocritic unnamedResult in test helpers
+    - path: helpers_test\.go
+      linters:
+        - gocritic
 
 linters:
   enable:
