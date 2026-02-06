@@ -31,7 +31,7 @@ type Pane struct {
 	autoScroll bool // Auto-scroll to bottom on new output
 }
 
-func newPane(shell string, env []string, width, height int, scrollbackSize int) *Pane {
+func newPane(shell string, env []string, width, height, scrollbackSize int) *Pane {
 	cwd, _ := os.Getwd()
 	return &Pane{
 		ID:         nextPaneID(),
