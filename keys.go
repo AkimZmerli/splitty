@@ -34,24 +34,24 @@ func DefaultKeyMap() KeyMap {
 			key.WithHelp("ctrl+h", "split horizontal"),
 		),
 		Close: key.NewBinding(
-			key.WithKeys("ctrl+w"),
-			key.WithHelp("ctrl+w", "close pane"),
+			key.WithKeys("ctrl+c"),
+			key.WithHelp("ctrl+c", "close pane"),
 		),
 		FocusLeft: key.NewBinding(
-			key.WithKeys("ctrl+left"),
-			key.WithHelp("ctrl+left", "focus left"),
+			key.WithKeys("ctrl+a"),
+			key.WithHelp("ctrl+a", "focus left"),
 		),
 		FocusDown: key.NewBinding(
-			key.WithKeys("ctrl+down"),
-			key.WithHelp("ctrl+down", "focus down"),
+			key.WithKeys("ctrl+s"),
+			key.WithHelp("ctrl+s", "focus down"),
 		),
 		FocusUp: key.NewBinding(
-			key.WithKeys("ctrl+up"),
-			key.WithHelp("ctrl+up", "focus up"),
+			key.WithKeys("ctrl+w"),
+			key.WithHelp("ctrl+w", "focus up"),
 		),
 		FocusRight: key.NewBinding(
-			key.WithKeys("ctrl+right"),
-			key.WithHelp("ctrl+right", "focus right"),
+			key.WithKeys("ctrl+d"),
+			key.WithHelp("ctrl+d", "focus right"),
 		),
 		FocusCycle: key.NewBinding(
 			key.WithKeys("tab"),
