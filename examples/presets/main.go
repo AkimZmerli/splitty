@@ -13,7 +13,7 @@ func main() {
 	// with the right side split horizontally
 	m := splitty.New(
 		splitty.WithPreset(splitty.PresetDev),
-		splitty.WithTheme(splitty.Catppuccin),
+		splitty.WithTheme(splitty.Sorbet),
 	)
 
 	p := tea.NewProgram(m,

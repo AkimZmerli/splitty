@@ -10,10 +10,10 @@ type themeEntry struct {
 
 // themeList is the ordered list of built-in themes for cycling.
 var themeList = []themeEntry{
-	{"Default", TokyoNight},
-	{"Dracula", Dracula},
-	{"Nord", Nord},
-	{"Catppuccin", Catppuccin},
+	{"Tokyo Night", TokyoNight},
+	{"Nightshade", Nightshade},
+	{"Glacier", Glacier},
+	{"Sorbet", Sorbet},
 }
 
 // Theme defines the visual styling for split panes.
@@ -84,8 +84,8 @@ var TokyoNight = Theme{
 	BroadcastIndicator: "◉ BROADCAST",
 }
 
-// Dracula is a dark theme inspired by the Dracula color scheme.
-var Dracula = Theme{
+// Nightshade is a dark purple theme with vivid accents.
+var Nightshade = Theme{
 	BorderActive: lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("#BD93F9")),
@@ -111,8 +111,8 @@ var Dracula = Theme{
 	BroadcastIndicator: "◉ BROADCAST",
 }
 
-// Nord is a dark theme inspired by the Nord color scheme.
-var Nord = Theme{
+// Glacier is an arctic blue theme with cool, muted tones.
+var Glacier = Theme{
 	BorderActive: lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("#88C0D0")),
@@ -138,8 +138,8 @@ var Nord = Theme{
 	BroadcastIndicator: "◉ BROADCAST",
 }
 
-// Catppuccin is a dark theme inspired by the Catppuccin Mocha color scheme.
-var Catppuccin = Theme{
+// Sorbet is a warm pastel theme with soft lavender and peach tones.
+var Sorbet = Theme{
 	BorderActive: lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("#CBA6F7")),

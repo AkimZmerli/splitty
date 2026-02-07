@@ -20,7 +20,7 @@ type app struct {
 func newApp() *app {
 	return &app{
 		splits: splitty.New(
-			splitty.WithTheme(splitty.Nord),
+			splitty.WithTheme(splitty.Glacier),
 			splitty.WithStatusBar(false), // we render our own chrome
 		),
 	}

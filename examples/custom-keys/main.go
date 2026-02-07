@@ -22,7 +22,7 @@ func main() {
 
 	m := splitty.New(
 		splitty.WithKeyMap(keys),
-		splitty.WithTheme(splitty.Dracula),
+		splitty.WithTheme(splitty.Nightshade),
 	)
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
