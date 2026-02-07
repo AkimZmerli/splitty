@@ -27,6 +27,7 @@ type KeyMap struct {
 	ScrollToTop     key.Binding
 	ScrollToBottom  key.Binding
 	CycleTheme      key.Binding
+	EnterCopyMode   key.Binding
 }
 
 // DefaultKeyMap returns the default keybindings for split pane operations.
@@ -41,8 +42,8 @@ func DefaultKeyMap() KeyMap {
 			key.WithHelp("ctrl+h", "split horizontal"),
 		),
 		Close: key.NewBinding(
-			key.WithKeys("ctrl+c"),
-			key.WithHelp("ctrl+c", "close pane"),
+			key.WithKeys("ctrl+q"),
+			key.WithHelp("ctrl+q", "close pane"),
 		),
 		FocusLeft: key.NewBinding(
 			key.WithKeys("ctrl+a"),
@@ -123,6 +124,10 @@ func DefaultKeyMap() KeyMap {
 		CycleTheme: key.NewBinding(
 			key.WithKeys("ctrl+t"),
 			key.WithHelp("ctrl+t", "cycle theme"),
+		),
+		EnterCopyMode: key.NewBinding(
+			key.WithKeys("ctrl+["),
+			key.WithHelp("ctrl+[", "copy mode"),
 		),
 	}
 }

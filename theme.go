@@ -22,6 +22,9 @@ type Theme struct {
 	BorderInactive         lipgloss.Style
 	BorderScrollback       lipgloss.Style
 	BorderScrollbackFocused lipgloss.Style
+	BorderResize           lipgloss.Style
+	BorderCopyMode         lipgloss.Style
+	BorderCopyModeFocused  lipgloss.Style
 	Divider                lipgloss.Style
 	DividerChar            string
 	StatusBar              lipgloss.Style
@@ -44,6 +47,15 @@ var DefaultTheme = Theme{
 	BorderScrollbackFocused: lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("214")),
+	BorderResize: lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("44")),
+	BorderCopyMode: lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("76")),
+	BorderCopyModeFocused: lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("118")),
 	Divider: lipgloss.NewStyle().
 		Foreground(lipgloss.Color("240")),
 	DividerChar: "│",
@@ -71,6 +83,15 @@ var TokyoNight = Theme{
 	BorderScrollbackFocused: lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("#FF9E64")),
+	BorderResize: lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#2AC3DE")),
+	BorderCopyMode: lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#73DACA")),
+	BorderCopyModeFocused: lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#9ECE6A")),
 	Divider: lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#565F89")),
 	DividerChar: "│",
@@ -98,6 +119,15 @@ var Nightshade = Theme{
 	BorderScrollbackFocused: lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("#FFB86C")),
+	BorderResize: lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#8BE9FD")),
+	BorderCopyMode: lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#50FA7B")),
+	BorderCopyModeFocused: lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#69FF94")),
 	Divider: lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#6272A4")),
 	DividerChar: "│",
@@ -125,6 +155,15 @@ var Glacier = Theme{
 	BorderScrollbackFocused: lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("#D08770")),
+	BorderResize: lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#88C0D0")),
+	BorderCopyMode: lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#A3BE8C")),
+	BorderCopyModeFocused: lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#B3CE9C")),
 	Divider: lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#4C566A")),
 	DividerChar: "│",
@@ -152,6 +191,15 @@ var Sorbet = Theme{
 	BorderScrollbackFocused: lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("#FAB387")),
+	BorderResize: lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#94E2D5")),
+	BorderCopyMode: lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#A6E3A1")),
+	BorderCopyModeFocused: lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#B6F3B1")),
 	Divider: lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#6C7086")),
 	DividerChar: "│",

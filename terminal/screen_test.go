@@ -782,6 +782,116 @@ func TestResizeCursorClamp(t *testing.T) {
 	}
 }
 
+func TestDECSetMouseMode(t *testing.T) {
+	s := NewScreen(10, 5)
+
+	t.Run("mode 1000 set and reset", func(t *testing.T) {
+		s.Write([]byte("\x1b[?1000h"))
+		if !s.HasMouseMode() {
+			t.Error("expected mouse mode enabled")
+		}
+		if s.MouseMode() != 1000 {
+			t.Errorf("expected mode 1000, got %d", s.MouseMode())
+		}
+		s.Write([]byte("\x1b[?1000l"))
+		if s.HasMouseMode() {
+			t.Error("expected mouse mode disabled")
+		}
+	})
+
+	t.Run("mode 1002", func(t *testing.T) {
+		s.Write([]byte("\x1b[?1002h"))
+		if s.MouseMode() != 1002 {
+			t.Errorf("expected mode 1002, got %d", s.MouseMode())
+		}
+		s.Write([]byte("\x1b[?1002l"))
+	})
+
+	t.Run("mode 1003", func(t *testing.T) {
+		s.Write([]byte("\x1b[?1003h"))
+		if s.MouseMode() != 1003 {
+			t.Errorf("expected mode 1003, got %d", s.MouseMode())
+		}
+		s.Write([]byte("\x1b[?1003l"))
+	})
+
+	t.Run("mode 9 X10", func(t *testing.T) {
+		s.Write([]byte("\x1b[?9h"))
+		if s.MouseMode() != 9 {
+			t.Errorf("expected mode 9, got %d", s.MouseMode())
+		}
+		s.Write([]byte("\x1b[?9l"))
+	})
+
+	t.Run("SGR encoding 1006", func(t *testing.T) {
+		s.Write([]byte("\x1b[?1006h"))
+		if s.MouseEncoding() != 1006 {
+			t.Errorf("expected encoding 1006, got %d", s.MouseEncoding())
+		}
+		s.Write([]byte("\x1b[?1006l"))
+		if s.MouseEncoding() != 0 {
+			t.Errorf("expected encoding 0, got %d", s.MouseEncoding())
+		}
+	})
+}
+
+func TestAltScreenTracking(t *testing.T) {
+	s := NewScreen(10, 5)
+
+	s.Write([]byte("\x1b[?1049h"))
+	if !s.IsAltScreen() {
+		t.Error("expected alt screen enabled")
+	}
+	s.Write([]byte("\x1b[?1049l"))
+	if s.IsAltScreen() {
+		t.Error("expected alt screen disabled")
+	}
+}
+
+func TestFullResetClearsMouseState(t *testing.T) {
+	s := NewScreen(10, 5)
+	s.Write([]byte("\x1b[?1000h\x1b[?1006h\x1b[?1049h"))
+	s.Write([]byte("\x1bc")) // RIS
+
+	if s.HasMouseMode() {
+		t.Error("mouse mode should be cleared after reset")
+	}
+	if s.MouseEncoding() != 0 {
+		t.Error("mouse encoding should be cleared after reset")
+	}
+	if s.IsAltScreen() {
+		t.Error("alt screen should be cleared after reset")
+	}
+}
+
+func TestStableViewWhenScrolledBack(t *testing.T) {
+	s := NewScreenWithScrollback(5, 3, 100)
+	// Fill screen
+	s.Write([]byte("AAAAA\r\nBBBBB\r\nCCCCC"))
+	// Scroll some lines into scrollback
+	s.Write([]byte("\n")) // push AAAAA into scrollback
+	s.Write([]byte("DDDDD"))
+
+	// User scrolls back
+	s.ScrollViewUp(1)
+	if s.viewOffset != 1 {
+		t.Fatalf("expected viewOffset=1, got %d", s.viewOffset)
+	}
+
+	// New output arrives that causes scrollUp
+	s.mu.Lock()
+	s.scrollUp(1)
+	s.mu.Unlock()
+
+	// viewOffset should have been incremented to keep view stable
+	s.mu.RLock()
+	vo := s.viewOffset
+	s.mu.RUnlock()
+	if vo != 2 {
+		t.Errorf("expected viewOffset=2 after stable scroll, got %d", vo)
+	}
+}
+
 func TestScreenWriteImplementsIOWriter(t *testing.T) {
 	s := NewScreen(10, 5)
 	n, err := s.Write([]byte("test"))

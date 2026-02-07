@@ -84,3 +84,14 @@ func WithScrollbackLines(lines int) Option {
 		m.scrollbackLines = lines
 	}
 }
+
+// WithScrollSpeed sets the number of lines scrolled per mouse wheel notch.
+// Default: 3 lines.
+func WithScrollSpeed(lines int) Option {
+	return func(m *Manager) {
+		if lines < 1 {
+			lines = 1
+		}
+		m.scrollSpeed = lines
+	}
+}

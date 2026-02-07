@@ -1,5 +1,16 @@
 package splitty
 
+// clampRatio clamps a split ratio to the valid range [0.1, 0.9].
+func clampRatio(r float64) float64 {
+	if r < 0.1 {
+		return 0.1
+	}
+	if r > 0.9 {
+		return 0.9
+	}
+	return r
+}
+
 // Resize adjusts the split ratio of the nearest ancestor split node
 // along the given axis by delta (positive = grow first child).
 func (m *Manager) Resize(dir Direction, delta float64) {
@@ -33,6 +44,46 @@ func (m *Manager) Resize(dir Direction, delta float64) {
 		m.layoutAll()
 		return
 	}
+}
+
+// findBorder checks if the given screen coordinates are on a split border.
+// Returns the split node and its direction if found, nil otherwise.
+func findBorder(root node, mouseX, mouseY, totalWidth, totalHeight int) *splitNode {
+	return findBorderAt(root, 0, 0, totalWidth, totalHeight, mouseX, mouseY)
+}
+
+func findBorderAt(n node, x, y, width, height, mx, my int) *splitNode {
+	sn, ok := n.(*splitNode)
+	if !ok {
+		return nil
+	}
+
+	if sn.dir == Vertical {
+		leftW := int(float64(width) * sn.ratio)
+		borderX := x + leftW
+		// Hit if mouse is within 1 cell of the border column
+		if mx >= borderX-1 && mx <= borderX && my >= y && my < y+height {
+			return sn
+		}
+		// Recurse into children
+		rightW := width - leftW
+		if found := findBorderAt(sn.first, x, y, leftW, height, mx, my); found != nil {
+			return found
+		}
+		return findBorderAt(sn.second, x+leftW, y, rightW, height, mx, my)
+	}
+
+	// Horizontal
+	topH := int(float64(height) * sn.ratio)
+	borderY := y + topH
+	if my >= borderY-1 && my <= borderY && mx >= x && mx < x+width {
+		return sn
+	}
+	bottomH := height - topH
+	if found := findBorderAt(sn.first, x, y, width, topH, mx, my); found != nil {
+		return found
+	}
+	return findBorderAt(sn.second, x, y+topH, width, bottomH, mx, my)
 }
 
 // layoutAll recalculates all pane positions and sizes from the tree.
