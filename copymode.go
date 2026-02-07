@@ -1,5 +1,7 @@
 package splitty
 
+import tea "github.com/charmbracelet/bubbletea"
+
 // CopyMode represents the state of vim-style copy mode navigation.
 type CopyMode struct {
 	Active bool
@@ -24,17 +26,17 @@ type CopyMode struct {
 }
 
 // handleCopyModeKey processes a key press while in copy mode.
-// Returns true if the key was consumed.
-func (m *Manager) handleCopyModeKey(key string) bool {
+// Returns (consumed, cmd).
+func (m *Manager) handleCopyModeKey(key string) (bool, tea.Cmd) {
 	p := m.findPane(m.copyMode.PaneID)
 	if p == nil {
 		m.exitCopyMode()
-		return true
+		return true, nil
 	}
 
 	// Search input mode
 	if m.copyMode.Searching {
-		return m.handleSearchInput(key, p)
+		return m.handleSearchInput(key, p), nil
 	}
 
 	switch key {
@@ -130,8 +132,9 @@ func (m *Manager) handleCopyModeKey(key string) bool {
 	// Yank
 	case "y":
 		if m.copyMode.Visual {
-			m.yankVisualSelection(p)
+			cmd := m.yankVisualSelection(p)
 			m.exitCopyMode()
+			return true, cmd
 		}
 
 	// Search
@@ -149,9 +152,9 @@ func (m *Manager) handleCopyModeKey(key string) bool {
 		m.searchPrev(p)
 
 	default:
-		return false
+		return false, nil
 	}
-	return true
+	return true, nil
 }
 
 func (m *Manager) handleSearchInput(key string, p *Pane) bool {
@@ -244,7 +247,7 @@ func (m *Manager) exitCopyMode() {
 	m.copyMode = CopyMode{}
 }
 
-func (m *Manager) yankVisualSelection(p *Pane) {
+func (m *Manager) yankVisualSelection(p *Pane) tea.Cmd {
 	var sr, sc, er, ec int
 	if m.copyMode.VisualLine {
 		sr = m.copyMode.VisualRow
@@ -274,8 +277,9 @@ func (m *Manager) yankVisualSelection(p *Pane) {
 		sel.Mode = SelectLine
 	}
 	m.selection = sel
-	m.copySelectionToClipboard()
+	cmd := m.copySelectionToClipboard()
 	m.selection.Active = false
+	return cmd
 }
 
 // Word navigation helpers

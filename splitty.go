@@ -256,8 +256,8 @@ func (m *Manager) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Copy mode intercepts all keys
 	if m.copyMode.Active {
 		keyStr := msg.String()
-		m.handleCopyModeKey(keyStr)
-		return m, nil
+		_, cmd := m.handleCopyModeKey(keyStr)
+		return m, cmd
 	}
 
 	switch {
@@ -536,10 +536,17 @@ func (m *Manager) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Mouse release: copy selection to clipboard
+	// Mouse release: copy selection to clipboard (only if actually selected text)
 	if msg.Action == tea.MouseActionRelease {
 		if m.selection.Active {
-			m.copySelectionToClipboard()
+			sr, sc, er, ec := m.selection.Normalize()
+			// Only copy if there's a real selection (not just a click)
+			if sr != er || sc != ec {
+				cmd := m.copySelectionToClipboard()
+				return m, cmd
+			}
+			// Single click release with no drag — clear selection
+			m.selection.Active = false
 		}
 		return m, nil
 	}
@@ -598,25 +605,30 @@ func (m *Manager) selectWord(p *Pane, col, row int) {
 }
 
 // copySelectionToClipboard copies the selected text via OSC 52.
-func (m *Manager) copySelectionToClipboard() {
+// Returns a tea.Cmd to write the escape sequence to the outer terminal.
+func (m *Manager) copySelectionToClipboard() tea.Cmd {
 	if !m.selection.Active {
-		return
+		return nil
 	}
 	p := m.findPane(m.selection.PaneID)
 	if p == nil {
-		return
+		return nil
 	}
 	sr, sc, er, ec := m.selection.Normalize()
 	text := p.screen.GetText(sr, sc, er, ec)
 	if text == "" {
-		return
+		return nil
 	}
 
 	// OSC 52 clipboard: \x1b]52;c;<base64>\x07
 	encoded := base64.StdEncoding.EncodeToString([]byte(text))
 	osc52 := fmt.Sprintf("\x1b]52;c;%s\x07", encoded)
-	// Write to stdout (the outer terminal) to set clipboard
-	os.Stdout.WriteString(osc52)
+
+	return func() tea.Msg {
+		// Write OSC 52 directly to the outer terminal
+		os.Stdout.WriteString(osc52)
+		return nil
+	}
 }
 
 // isPaneAdjacentToDrag returns true if the pane is a direct child of the drag split.
