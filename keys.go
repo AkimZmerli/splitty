@@ -62,12 +62,12 @@ func DefaultKeyMap() KeyMap {
 			key.WithHelp("ctrl+d", "focus right"),
 		),
 		FocusCycle: key.NewBinding(
-			key.WithKeys("tab"),
-			key.WithHelp("tab", "next pane"),
+			key.WithKeys("ctrl+tab"),
+			key.WithHelp("ctrl+tab", "next pane"),
 		),
 		FocusCycleBack: key.NewBinding(
-			key.WithKeys("shift+tab"),
-			key.WithHelp("shift+tab", "prev pane"),
+			key.WithKeys("ctrl+shift+tab"),
+			key.WithHelp("ctrl+shift+tab", "prev pane"),
 		),
 		Zoom: key.NewBinding(
 			key.WithKeys("ctrl+z"),

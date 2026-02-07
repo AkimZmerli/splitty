@@ -1042,23 +1042,31 @@ func (s *Screen) renderInternal(highlight [][]bool) string {
 		for col := 0; col < s.width; col++ {
 			var cell Cell
 
-			// Determine which cell to render based on viewOffset
+			// Determine which cell to render based on viewOffset.
+			// The combined virtual buffer is:
+			//   [scrollback oldest..newest] + [cells 0..height-1]
+			// At viewOffset=V, the visible window starts at (scrollbackLen - V).
 			if s.viewOffset > 0 && s.scrollbackLen > 0 {
-				linesFromTop := s.viewOffset
-				oldestIdx := (s.scrollbackHead - s.scrollbackLen) % s.scrollbackSize
-				if oldestIdx < 0 {
-					oldestIdx += s.scrollbackSize
-				}
-
-				if row < linesFromTop && row < s.scrollbackLen {
-					sbIdx := (oldestIdx + row) % s.scrollbackSize
+				combinedIdx := (s.scrollbackLen - s.viewOffset) + row
+				if combinedIdx < 0 {
+					cell = EmptyCell()
+				} else if combinedIdx < s.scrollbackLen {
+					// This row maps to a scrollback line
+					oldestIdx := (s.scrollbackHead - s.scrollbackLen + s.scrollbackSize) % s.scrollbackSize
+					sbIdx := (oldestIdx + combinedIdx) % s.scrollbackSize
 					if s.scrollback[sbIdx] != nil && col < len(s.scrollback[sbIdx]) {
 						cell = s.scrollback[sbIdx][col]
 					} else {
 						cell = EmptyCell()
 					}
 				} else {
-					cell = s.cells[row][col]
+					// This row maps to a current cell line
+					cellRow := combinedIdx - s.scrollbackLen
+					if cellRow >= 0 && cellRow < s.height {
+						cell = s.cells[cellRow][col]
+					} else {
+						cell = EmptyCell()
+					}
 				}
 			} else {
 				cell = s.cells[row][col]
