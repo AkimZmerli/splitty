@@ -2,6 +2,20 @@ package splitty
 
 import "github.com/charmbracelet/lipgloss"
 
+// themeEntry pairs a theme with its display name.
+type themeEntry struct {
+	Name  string
+	Theme Theme
+}
+
+// themeList is the ordered list of built-in themes for cycling.
+var themeList = []themeEntry{
+	{"Default", TokyoNight},
+	{"Dracula", Dracula},
+	{"Nord", Nord},
+	{"Catppuccin", Catppuccin},
+}
+
 // Theme defines the visual styling for split panes.
 type Theme struct {
 	BorderActive           lipgloss.Style

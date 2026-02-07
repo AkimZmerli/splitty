@@ -26,6 +26,7 @@ type KeyMap struct {
 	ScrollPageDown  key.Binding
 	ScrollToTop     key.Binding
 	ScrollToBottom  key.Binding
+	CycleTheme      key.Binding
 }
 
 // DefaultKeyMap returns the default keybindings for split pane operations.
@@ -118,6 +119,10 @@ func DefaultKeyMap() KeyMap {
 		ScrollToBottom: key.NewBinding(
 			key.WithKeys("ctrl+end"),
 			key.WithHelp("ctrl+end", "scroll to bottom"),
+		),
+		CycleTheme: key.NewBinding(
+			key.WithKeys("ctrl+t"),
+			key.WithHelp("ctrl+t", "cycle theme"),
 		),
 	}
 }

@@ -39,6 +39,7 @@ type Manager struct {
 	preZoomRoot  node
 	broadcasting bool
 	ready        bool
+	themeIndex   int
 
 	// Context menu
 	menu contextMenu
@@ -59,7 +60,7 @@ func New(opts ...Option) *Manager {
 
 	m := &Manager{
 		shell:           shell,
-		theme:           DefaultTheme,
+		theme:           TokyoNight,
 		keyMap:          DefaultKeyMap(),
 		minWidth:        10,
 		minHeight:       3,
@@ -286,6 +287,9 @@ func (m *Manager) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if p := m.findPane(m.focusedID); p != nil {
 			p.resetScroll()
 		}
+	case key.Matches(msg, m.keyMap.CycleTheme):
+		m.themeIndex = (m.themeIndex + 1) % len(themeList)
+		m.theme = themeList[m.themeIndex].Theme
 	default:
 		// Forward keystrokes to pane(s)
 		data := keyToBytes(msg)
@@ -500,7 +504,8 @@ func (m *Manager) renderStatusBar() string {
 	}
 
 	left := strings.Join(parts, "  ")
-	right := fmt.Sprintf("Pane %d/%d", idx, paneCount)
+	themeName := themeList[m.themeIndex].Name
+	right := fmt.Sprintf("%s  Pane %d/%d", themeName, idx, paneCount)
 
 	gap := m.width - lipgloss.Width(left) - lipgloss.Width(right) - 2
 	if gap < 0 {
