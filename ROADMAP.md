@@ -166,6 +166,8 @@ These are speculative ideas that need more thought before committing to a phase.
 - **AI-powered routing**: Automatically route focus to the pane that needs attention most
 - **Splitty Cloud**: Persist sessions across machines, share layouts with team
 - **Terminal within terminal**: Nest Splitty instances for complex hierarchical workflows
+- **Command autocomplete**: Accept-style autocomplete for commands within panes
+- **Dynamic theme waves**: Animated wave effects across pane borders/backgrounds for visual flair
 
 ---
 
