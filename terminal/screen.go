@@ -1073,9 +1073,10 @@ func (s *Screen) renderInternal(highlight [][]bool) string {
 			}
 
 			renderStyle := cell.Style
-			if s.cursor.Visible && s.viewOffset == 0 && row == s.cursor.Row && col == s.cursor.Col {
-				renderStyle.Reverse = !renderStyle.Reverse
-			}
+			// Don't render cursor in nested TUI context; Bubble Tea handles cursor positioning
+			// if s.cursor.Visible && s.viewOffset == 0 && row == s.cursor.Row && col == s.cursor.Col {
+			// 	renderStyle.Reverse = !renderStyle.Reverse
+			// }
 			// Apply selection highlight
 			if highlight != nil && row < len(highlight) && col < len(highlight[row]) && highlight[row][col] {
 				renderStyle.Reverse = !renderStyle.Reverse
