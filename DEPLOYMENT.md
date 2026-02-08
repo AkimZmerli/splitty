@@ -9,11 +9,14 @@ This document contemplates two primary deployment strategies for Splitty as a pr
 Splitty operates as a traditional terminal multiplexer, similar to `tmux` or `screen`:
 
 ```bash
-# Build
-go build -o splitty .
+# Build from cmd/splitty
+go build -o splitty ./cmd/splitty
 
-# Install to PATH
+# Install to PATH (option 1: system-wide)
 sudo mv splitty /usr/local/bin/
+
+# Install to PATH (option 2: user ~/.zshrc or ~/.bashrc)
+export PATH="/path/to/splitty:$PATH"
 
 # Usage
 splitty                    # Start a new session
@@ -83,6 +86,32 @@ go build && cp splitty /usr/local/bin/
 - Provide `.zshrc`/`.bashrc` snippets for power users
 - Optional alias: `alias st=splitty`
 - Optional keybinding for quick access
+
+**PATH Setup (Make Accessible Anywhere)**
+
+If the binary is not in a standard PATH location, add it to your shell config:
+
+**zsh (~/.zshrc)**
+```bash
+export PATH="/path/to/splitty:$PATH"
+source ~/.zshrc
+```
+
+**bash (~/.bashrc)**
+```bash
+export PATH="/path/to/splitty:$PATH"
+source ~/.bashrc
+```
+
+Alternatively, create a symlink in an existing PATH directory:
+```bash
+ln -s /path/to/splitty/splitty /usr/local/bin/splitty
+```
+
+Then test:
+```bash
+splitty    # Should work from any directory
+```
 
 ---
 
