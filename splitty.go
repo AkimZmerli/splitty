@@ -299,26 +299,32 @@ func (m *Manager) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keyMap.ScrollUp):
 		if p := m.findPane(m.focusedID); p != nil {
 			p.scrollUp(1)
+			m.selection.Active = false
 		}
 	case key.Matches(msg, m.keyMap.ScrollDown):
 		if p := m.findPane(m.focusedID); p != nil {
 			p.scrollDown(1)
+			m.selection.Active = false
 		}
 	case key.Matches(msg, m.keyMap.ScrollPageUp):
 		if p := m.findPane(m.focusedID); p != nil {
 			p.scrollUp(p.Height / 2)
+			m.selection.Active = false
 		}
 	case key.Matches(msg, m.keyMap.ScrollPageDown):
 		if p := m.findPane(m.focusedID); p != nil {
 			p.scrollDown(p.Height / 2)
+			m.selection.Active = false
 		}
 	case key.Matches(msg, m.keyMap.ScrollToTop):
 		if p := m.findPane(m.focusedID); p != nil {
 			p.scrollUp(999999)
+			m.selection.Active = false
 		}
 	case key.Matches(msg, m.keyMap.ScrollToBottom):
 		if p := m.findPane(m.focusedID); p != nil {
 			p.resetScroll()
+			m.selection.Active = false
 		}
 	case key.Matches(msg, m.keyMap.CycleTheme):
 		m.themeIndex = (m.themeIndex + 1) % len(themeList)
@@ -438,6 +444,7 @@ func (m *Manager) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			} else {
 				hitPane.scrollDown(m.scrollSpeed)
 			}
+			m.selection.Active = false
 		}
 		return m, nil
 	}
