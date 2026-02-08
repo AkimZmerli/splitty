@@ -747,6 +747,7 @@ func (m *Manager) renderNode(n node, width, height int) string {
 }
 
 func (m *Manager) renderPane(p *Pane, width, height int) string {
+	focused := p.ID == m.focusedID
 	var content string
 	if m.copyMode.Active && m.copyMode.PaneID == p.ID {
 		highlight := m.getCopyModeHighlight(p)
@@ -754,7 +755,7 @@ func (m *Manager) renderPane(p *Pane, width, height int) string {
 	} else if m.selection.Active && m.selection.PaneID == p.ID {
 		content = p.renderWithSelection(&m.selection)
 	} else {
-		content = p.render()
+		content = p.screen.RenderWithOptions(nil, focused)
 	}
 	var style lipgloss.Style
 

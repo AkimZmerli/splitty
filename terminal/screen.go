@@ -1012,12 +1012,16 @@ func (s *Screen) fullReset() {
 // Highlighted cells have their Reverse attribute toggled.
 // If highlight is nil, behaves identically to Render().
 func (s *Screen) RenderWithHighlight(highlight [][]bool) string {
-	if highlight == nil {
-		return s.Render()
-	}
+	return s.RenderWithOptions(highlight, false)
+}
+
+// RenderWithOptions renders the cell grid with optional highlighting and cursor display.
+// When showCursor is true and the inner terminal's cursor is visible, the cursor
+// cell is rendered with reverse video (used for the focused pane).
+func (s *Screen) RenderWithOptions(highlight [][]bool, showCursor bool) string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.renderInternal(highlight)
+	return s.renderInternal(highlight, showCursor)
 }
 
 // Render converts the cell grid to an ANSI string suitable for display
@@ -1025,10 +1029,10 @@ func (s *Screen) RenderWithHighlight(highlight [][]bool) string {
 func (s *Screen) Render() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.renderInternal(nil)
+	return s.renderInternal(nil, false)
 }
 
-func (s *Screen) renderInternal(highlight [][]bool) string {
+func (s *Screen) renderInternal(highlight [][]bool, showCursor bool) string {
 	var buf strings.Builder
 	buf.Grow(s.width * s.height * 2)
 
@@ -1073,10 +1077,10 @@ func (s *Screen) renderInternal(highlight [][]bool) string {
 			}
 
 			renderStyle := cell.Style
-			// Don't render cursor in nested TUI context; Bubble Tea handles cursor positioning
-			// if s.cursor.Visible && s.viewOffset == 0 && row == s.cursor.Row && col == s.cursor.Col {
-			// 	renderStyle.Reverse = !renderStyle.Reverse
-			// }
+			// Show cursor as reverse-video block when this pane is focused
+			if showCursor && s.cursor.Visible && s.viewOffset == 0 && row == s.cursor.Row && col == s.cursor.Col {
+				renderStyle.Reverse = !renderStyle.Reverse
+			}
 			// Apply selection highlight
 			if highlight != nil && row < len(highlight) && col < len(highlight[row]) && highlight[row][col] {
 				renderStyle.Reverse = !renderStyle.Reverse
