@@ -626,7 +626,7 @@ func (s *Screen) reverseIndex() {
 func (s *Screen) scrollUp(n int) {
 	for i := 0; i < n; i++ {
 		// Save the line being scrolled off to the scrollback buffer
-		if s.scrollbackSize > 0 && s.scrollTop == 0 {
+		if s.scrollbackSize > 0 && s.scrollTop == 0 && !s.altScreen {
 			topLine := s.copyLine(s.cells[0])
 			s.scrollback[s.scrollbackHead] = topLine
 			s.scrollbackHead = (s.scrollbackHead + 1) % s.scrollbackSize
