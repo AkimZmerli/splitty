@@ -38,8 +38,8 @@ func DefaultKeyMap() KeyMap {
 			key.WithHelp("ctrl+v", "split vertical"),
 		),
 		SplitHorizontal: key.NewBinding(
-			key.WithKeys("ctrl+h"),
-			key.WithHelp("ctrl+h", "split horizontal"),
+			key.WithKeys("ctrl+c"),
+			key.WithHelp("ctrl+c", "split horizontal"),
 		),
 		Close: key.NewBinding(
 			key.WithKeys("ctrl+q"),
