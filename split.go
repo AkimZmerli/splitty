@@ -1,6 +1,6 @@
 package splitty
 
-import tea "github.com/charmbracelet/bubbletea"
+import tea "charm.land/bubbletea/v2"
 
 // Split divides the focused pane in the given direction.
 // Returns the updated model and a command to start the new pane's PTY.

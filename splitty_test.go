@@ -3,33 +3,33 @@ package splitty
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 func TestKeyToBytes(t *testing.T) {
 	tests := []struct {
 		name     string
-		msg      tea.KeyMsg
+		msg      tea.KeyPressMsg
 		expected []byte
 	}{
-		{"enter", tea.KeyMsg{Type: tea.KeyEnter}, []byte{'\r'}},
-		{"tab", tea.KeyMsg{Type: tea.KeyTab}, []byte{'\t'}},
-		{"backspace", tea.KeyMsg{Type: tea.KeyBackspace}, []byte{0x7f}},
-		{"escape", tea.KeyMsg{Type: tea.KeyEscape}, []byte{0x1b}},
-		{"up", tea.KeyMsg{Type: tea.KeyUp}, []byte("\x1b[A")},
-		{"down", tea.KeyMsg{Type: tea.KeyDown}, []byte("\x1b[B")},
-		{"right", tea.KeyMsg{Type: tea.KeyRight}, []byte("\x1b[C")},
-		{"left", tea.KeyMsg{Type: tea.KeyLeft}, []byte("\x1b[D")},
-		{"home", tea.KeyMsg{Type: tea.KeyHome}, []byte("\x1b[H")},
-		{"end", tea.KeyMsg{Type: tea.KeyEnd}, []byte("\x1b[F")},
-		{"pgup", tea.KeyMsg{Type: tea.KeyPgUp}, []byte("\x1b[5~")},
-		{"pgdown", tea.KeyMsg{Type: tea.KeyPgDown}, []byte("\x1b[6~")},
-		{"delete", tea.KeyMsg{Type: tea.KeyDelete}, []byte("\x1b[3~")},
-		{"space", tea.KeyMsg{Type: tea.KeySpace}, []byte{' '}},
-		{"runes", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'h', 'i'}}, []byte("hi")},
-		{"ctrl+a", tea.KeyMsg{Type: tea.KeyCtrlA}, []byte{0x01}},
-		{"ctrl+c", tea.KeyMsg{Type: tea.KeyCtrlC}, []byte{0x03}},
-		{"ctrl+z", tea.KeyMsg{Type: tea.KeyCtrlZ}, []byte{0x1a}},
+		{"enter", tea.KeyPressMsg{Code: tea.KeyEnter}, []byte{'\r'}},
+		{"tab", tea.KeyPressMsg{Code: tea.KeyTab}, []byte{'\t'}},
+		{"backspace", tea.KeyPressMsg{Code: tea.KeyBackspace}, []byte{0x7f}},
+		{"escape", tea.KeyPressMsg{Code: tea.KeyEscape}, []byte{0x1b}},
+		{"up", tea.KeyPressMsg{Code: tea.KeyUp}, []byte("\x1b[A")},
+		{"down", tea.KeyPressMsg{Code: tea.KeyDown}, []byte("\x1b[B")},
+		{"right", tea.KeyPressMsg{Code: tea.KeyRight}, []byte("\x1b[C")},
+		{"left", tea.KeyPressMsg{Code: tea.KeyLeft}, []byte("\x1b[D")},
+		{"home", tea.KeyPressMsg{Code: tea.KeyHome}, []byte("\x1b[H")},
+		{"end", tea.KeyPressMsg{Code: tea.KeyEnd}, []byte("\x1b[F")},
+		{"pgup", tea.KeyPressMsg{Code: tea.KeyPgUp}, []byte("\x1b[5~")},
+		{"pgdown", tea.KeyPressMsg{Code: tea.KeyPgDown}, []byte("\x1b[6~")},
+		{"delete", tea.KeyPressMsg{Code: tea.KeyDelete}, []byte("\x1b[3~")},
+		{"space", tea.KeyPressMsg{Code: tea.KeySpace}, []byte{' '}},
+		{"runes", tea.KeyPressMsg{Text: "hi"}, []byte("hi")},
+		{"ctrl+a", tea.KeyPressMsg{Code: 'a', Mod: tea.ModCtrl}, []byte{0x01}},
+		{"ctrl+c", tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl}, []byte{0x03}},
+		{"ctrl+z", tea.KeyPressMsg{Code: 'z', Mod: tea.ModCtrl}, []byte{0x1a}},
 	}
 
 	for _, tt := range tests {
@@ -50,7 +50,7 @@ func TestKeyToBytes(t *testing.T) {
 
 func TestKeyToBytesUnknown(t *testing.T) {
 	// F-keys or other unmapped types should return nil
-	msg := tea.KeyMsg{Type: tea.KeyF1}
+	msg := tea.KeyPressMsg{Code: tea.KeyF1}
 	got := keyToBytes(msg)
 	if got != nil {
 		t.Errorf("expected nil for unmapped key, got %v", got)
@@ -91,8 +91,8 @@ func TestManagerView(t *testing.T) {
 	t.Run("nil root shows initializing", func(t *testing.T) {
 		m := testManager(nil, "")
 		view := m.View()
-		if view != "Initializing..." {
-			t.Errorf("expected 'Initializing...', got %q", view)
+		if view.Content != "Initializing..." {
+			t.Errorf("expected 'Initializing...', got %q", view.Content)
 		}
 	})
 }

@@ -1,6 +1,6 @@
 package splitty
 
-import tea "github.com/charmbracelet/bubbletea"
+import tea "charm.land/bubbletea/v2"
 
 // CopyMode represents the state of vim-style copy mode navigation.
 type CopyMode struct {

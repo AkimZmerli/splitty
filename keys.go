@@ -1,6 +1,6 @@
 package splitty
 
-import "github.com/charmbracelet/bubbles/key"
+import "charm.land/bubbles/v2/key"
 
 // KeyMap defines all keybindings for split pane operations.
 type KeyMap struct {

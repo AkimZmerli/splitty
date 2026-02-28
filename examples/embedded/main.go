@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/AkimZmerli/splitty"
 )
 
@@ -36,7 +36,7 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.width = msg.Width
 		a.height = msg.Height
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		if msg.String() == "ctrl+t" {
 			a.showSidebar = !a.showSidebar
 			return a, nil
@@ -51,14 +51,15 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return a, cmd
 }
 
-func (a *app) View() string {
+func (a *app) View() tea.View {
 	sidebarWidth := 0
 	if a.showSidebar {
 		sidebarWidth = 25
 	}
 
-	splitsView := a.splits.View()
+	splitsContent := a.splits.View().Content
 
+	var content string
 	if sidebarWidth > 0 {
 		sidebar := lipgloss.NewStyle().
 			Width(sidebarWidth - 1).
@@ -68,17 +69,19 @@ func (a *app) View() string {
 			Padding(1).
 			Render("Sidebar\n\nCtrl+T toggle\nCtrl+Q quit")
 
-		return lipgloss.JoinHorizontal(lipgloss.Top, sidebar, splitsView)
+		content = lipgloss.JoinHorizontal(lipgloss.Top, sidebar, splitsContent)
+	} else {
+		content = splitsContent
 	}
 
-	return splitsView
+	v := tea.NewView(content)
+	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion
+	return v
 }
 
 func main() {
-	p := tea.NewProgram(newApp(),
-		tea.WithAltScreen(),
-		tea.WithMouseCellMotion(),
-	)
+	p := tea.NewProgram(newApp())
 
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)

@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/AkimZmerli/splitty/terminal"
-	"github.com/charmbracelet/bubbles/key"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 // Manager is the main Bubble Tea model for split pane terminal multiplexing.
@@ -111,12 +111,27 @@ func (m *Manager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		return m.handleWindowSize(msg)
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 
-	case tea.MouseMsg:
+	case tea.MouseClickMsg:
 		if m.mouse {
-			return m.handleMouse(msg)
+			return m.handleMouseClick(msg)
+		}
+
+	case tea.MouseReleaseMsg:
+		if m.mouse {
+			return m.handleMouseRelease(msg)
+		}
+
+	case tea.MouseMotionMsg:
+		if m.mouse {
+			return m.handleMouseMotion(msg)
+		}
+
+	case tea.MouseWheelMsg:
+		if m.mouse {
+			return m.handleMouseWheel(msg)
 		}
 
 	case PaneOutputMsg:
@@ -133,9 +148,11 @@ func (m *Manager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // View renders the current state of all panes.
-func (m *Manager) View() string {
+func (m *Manager) View() tea.View {
 	if m.root == nil {
-		return "Initializing..."
+		v := tea.NewView("Initializing...")
+		v.AltScreen = true
+		return v
 	}
 
 	var content string
@@ -154,7 +171,12 @@ func (m *Manager) View() string {
 		content = m.menu.overlayOnView(content, m.width, m.height, m.theme)
 	}
 
-	return content
+	v := tea.NewView(content)
+	v.AltScreen = true
+	if m.mouse {
+		v.MouseMode = tea.MouseModeCellMotion
+	}
+	return v
 }
 
 func (m *Manager) statusBarHeight() int {
@@ -232,10 +254,10 @@ func (m *Manager) initLayout() (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m *Manager) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *Manager) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// Intercept keys when context menu is visible
 	if m.menu.visible {
-		switch msg.Type {
+		switch msg.Code {
 		case tea.KeyEscape:
 			m.menu.hide()
 			return m, nil
@@ -339,141 +361,70 @@ func (m *Manager) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *Manager) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+func (m *Manager) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
+	mouse := msg.Mouse()
+	x, y := mouse.X, mouse.Y
+
 	// Context menu interactions
 	if m.menu.visible {
 		contentH := m.statusBarHeight()
-		switch {
-		case msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft:
-			if m.menu.hitTest(msg.X, msg.Y, m.width, contentH) {
-				idx := m.menu.hitTestItem(msg.X, msg.Y, m.width, contentH)
-				if idx >= 0 {
-					m.menu.selected = idx
-					return m.executeMenuAction()
-				}
-				return m, nil
-			}
-			// Click outside — dismiss menu
-			m.menu.hide()
-			return m, nil
-
-		case msg.Action == tea.MouseActionMotion:
-			idx := m.menu.hitTestItem(msg.X, msg.Y, m.width, contentH)
+		if m.menu.hitTest(x, y, m.width, contentH) {
+			idx := m.menu.hitTestItem(x, y, m.width, contentH)
 			if idx >= 0 {
 				m.menu.selected = idx
+				return m.executeMenuAction()
 			}
 			return m, nil
 		}
+		// Click outside — dismiss menu
+		m.menu.hide()
 		return m, nil
 	}
 
-	// Drag-to-resize handling (takes priority over everything else)
-	if m.dragging {
-		switch msg.Action {
-		case tea.MouseActionMotion:
-			h := m.statusBarHeight()
-			if m.dragDir == Vertical {
-				newRatio := float64(msg.X) / float64(m.width)
-				m.dragSplit.ratio = clampRatio(newRatio)
-			} else {
-				newRatio := float64(msg.Y) / float64(h)
-				m.dragSplit.ratio = clampRatio(newRatio)
-			}
-			m.layoutAll()
-		case tea.MouseActionRelease:
-			m.dragging = false
-			m.dragSplit = nil
-		}
-		return m, nil
-	}
-
-	// Check for border click to start drag (not while zoomed)
-	if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft && !m.zoomed {
+	// Check for border click to start drag (not while zoomed, left button only)
+	if mouse.Button == tea.MouseLeft && !m.zoomed {
 		h := m.statusBarHeight()
-		if sn := findBorder(m.root, msg.X, msg.Y, m.width, h); sn != nil {
+		if sn := findBorder(m.root, x, y, m.width, h); sn != nil {
 			m.dragging = true
 			m.dragSplit = sn
 			m.dragDir = sn.dir
-			m.dragOriginX = msg.X
-			m.dragOriginY = msg.Y
+			m.dragOriginX = x
+			m.dragOriginY = y
 			m.dragStartRatio = sn.ratio
 			return m, nil
 		}
 	}
 
 	// Find the pane under the mouse cursor
-	hitPane := m.findPaneAt(msg.X, msg.Y)
+	hitPane := m.findPaneAt(x, y)
 
-	// If the pane has mouse mode and Shift is not held, forward events to PTY
-	if hitPane != nil && hitPane.hasMouseMode() && !msg.Shift {
-		button, action, ok := m.translateMouseEvent(msg)
-		if !ok {
-			return m, nil
-		}
-		// Translate to pane-relative coordinates (inside the border)
-		termX := msg.X - hitPane.X - 1
-		termY := msg.Y - hitPane.Y - 1
-		// Clamp to pane dimensions
-		if termX < 0 {
-			termX = 0
-		}
-		if termY < 0 {
-			termY = 0
-		}
-		if termX >= hitPane.Width {
-			termX = hitPane.Width - 1
-		}
-		if termY >= hitPane.Height {
-			termY = hitPane.Height - 1
-		}
+	// If the pane has mouse mode and Shift is not held, forward press to PTY
+	if hitPane != nil && hitPane.hasMouseMode() && !mouse.Mod.Contains(tea.ModShift) {
+		button, action := m.translateMouseButton(mouse.Button, terminal.MouseActionPress)
+		termX, termY := m.clampToPaneCoords(hitPane, x, y)
 		hitPane.forwardMouse(button, action, termX, termY)
-		// Also focus the pane on press
-		if msg.Action == tea.MouseActionPress {
-			m.focusedID = hitPane.ID
-		}
-		return m, nil
-	}
-
-	// --- Splitty-level mouse handling (no mouse mode or Shift bypass) ---
-
-	// Mouse wheel scrolling
-	if msg.Action == tea.MouseActionPress && (msg.Button == tea.MouseButtonWheelUp || msg.Button == tea.MouseButtonWheelDown) {
-		if hitPane != nil {
-			if msg.Button == tea.MouseButtonWheelUp {
-				hitPane.scrollUp(m.scrollSpeed)
-			} else {
-				hitPane.scrollDown(m.scrollSpeed)
-			}
-			m.selection.Active = false
-		}
+		m.focusedID = hitPane.ID
 		return m, nil
 	}
 
 	// Right-click: show context menu (not while zoomed)
-	if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonRight && !m.zoomed {
+	if mouse.Button == tea.MouseRight && !m.zoomed {
 		if hitPane != nil {
 			m.focusedID = hitPane.ID
-			m.menu.show(msg.X, msg.Y, hitPane.ID)
+			m.menu.show(x, y, hitPane.ID)
 		}
 		return m, nil
 	}
 
 	// Left-click: focus + selection
-	if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft {
+	if mouse.Button == tea.MouseLeft {
 		if hitPane != nil {
 			m.focusedID = hitPane.ID
-			termX := msg.X - hitPane.X - 1
-			termY := msg.Y - hitPane.Y - 1
-			if termX < 0 {
-				termX = 0
-			}
-			if termY < 0 {
-				termY = 0
-			}
+			termX, termY := m.clampToPaneCoords(hitPane, x, y)
 
 			// Multi-click detection
 			now := time.Now().UnixMilli()
-			if msg.X == m.lastClickX && msg.Y == m.lastClickY && now-m.lastClickT < 500 {
+			if x == m.lastClickX && y == m.lastClickY && now-m.lastClickT < 500 {
 				m.clickCount++
 				if m.clickCount > 3 {
 					m.clickCount = 1
@@ -481,13 +432,12 @@ func (m *Manager) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			} else {
 				m.clickCount = 1
 			}
-			m.lastClickX = msg.X
-			m.lastClickY = msg.Y
+			m.lastClickX = x
+			m.lastClickY = y
 			m.lastClickT = now
 
 			switch m.clickCount {
 			case 1:
-				// Single click: clear selection, start char select
 				m.selection = Selection{
 					Active:   true,
 					Mode:     SelectChar,
@@ -498,10 +448,8 @@ func (m *Manager) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					EndCol:   termX,
 				}
 			case 2:
-				// Double click: select word
 				m.selectWord(hitPane, termX, termY)
 			case 3:
-				// Triple click: select line
 				m.selection = Selection{
 					Active:   true,
 					Mode:     SelectLine,
@@ -518,47 +466,123 @@ func (m *Manager) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Mouse drag: extend char selection
-	if msg.Action == tea.MouseActionMotion && msg.Button == tea.MouseButtonLeft {
+	return m, nil
+}
+
+func (m *Manager) handleMouseRelease(msg tea.MouseReleaseMsg) (tea.Model, tea.Cmd) {
+	mouse := msg.Mouse()
+
+	// Stop drag
+	if m.dragging {
+		m.dragging = false
+		m.dragSplit = nil
+		return m, nil
+	}
+
+	// If the pane has mouse mode and Shift is not held, forward release to PTY
+	hitPane := m.findPaneAt(mouse.X, mouse.Y)
+	if hitPane != nil && hitPane.hasMouseMode() && !mouse.Mod.Contains(tea.ModShift) {
+		button, action := m.translateMouseButton(mouse.Button, terminal.MouseActionRelease)
+		termX, termY := m.clampToPaneCoords(hitPane, mouse.X, mouse.Y)
+		hitPane.forwardMouse(button, action, termX, termY)
+		return m, nil
+	}
+
+	// Copy selection to clipboard (only if actually selected text)
+	if m.selection.Active {
+		sr, sc, er, ec := m.selection.Normalize()
+		if sr != er || sc != ec {
+			cmd := m.copySelectionToClipboard()
+			return m, cmd
+		}
+		m.selection.Active = false
+	}
+	return m, nil
+}
+
+func (m *Manager) handleMouseMotion(msg tea.MouseMotionMsg) (tea.Model, tea.Cmd) {
+	mouse := msg.Mouse()
+	x, y := mouse.X, mouse.Y
+
+	// Context menu hover
+	if m.menu.visible {
+		contentH := m.statusBarHeight()
+		idx := m.menu.hitTestItem(x, y, m.width, contentH)
+		if idx >= 0 {
+			m.menu.selected = idx
+		}
+		return m, nil
+	}
+
+	// Drag-to-resize
+	if m.dragging {
+		h := m.statusBarHeight()
+		if m.dragDir == Vertical {
+			m.dragSplit.ratio = clampRatio(float64(x) / float64(m.width))
+		} else {
+			m.dragSplit.ratio = clampRatio(float64(y) / float64(h))
+		}
+		m.layoutAll()
+		return m, nil
+	}
+
+	// If the pane has mouse mode and Shift is not held, forward motion to PTY
+	hitPane := m.findPaneAt(x, y)
+	if hitPane != nil && hitPane.hasMouseMode() && !mouse.Mod.Contains(tea.ModShift) {
+		button, action := m.translateMouseButton(mouse.Button, terminal.MouseActionMotion)
+		termX, termY := m.clampToPaneCoords(hitPane, x, y)
+		hitPane.forwardMouse(button, action, termX, termY)
+		return m, nil
+	}
+
+	// Extend char selection (left button held during drag)
+	if mouse.Button == tea.MouseLeft {
 		if m.selection.Active && m.selection.Mode == SelectChar {
 			if p := m.findPane(m.selection.PaneID); p != nil {
-				termX := msg.X - p.X - 1
-				termY := msg.Y - p.Y - 1
-				if termX < 0 {
-					termX = 0
-				}
-				if termY < 0 {
-					termY = 0
-				}
-				if termX >= p.Width {
-					termX = p.Width - 1
-				}
-				if termY >= p.Height {
-					termY = p.Height - 1
-				}
+				termX, termY := m.clampToPaneCoords(p, x, y)
 				m.selection.EndRow = termY
 				m.selection.EndCol = termX
 			}
 		}
-		return m, nil
 	}
-
-	// Mouse release: copy selection to clipboard (only if actually selected text)
-	if msg.Action == tea.MouseActionRelease {
-		if m.selection.Active {
-			sr, sc, er, ec := m.selection.Normalize()
-			// Only copy if there's a real selection (not just a click)
-			if sr != er || sc != ec {
-				cmd := m.copySelectionToClipboard()
-				return m, cmd
-			}
-			// Single click release with no drag — clear selection
-			m.selection.Active = false
-		}
-		return m, nil
-	}
-
 	return m, nil
+}
+
+func (m *Manager) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
+	if m.menu.visible {
+		return m, nil
+	}
+	mouse := msg.Mouse()
+	hitPane := m.findPaneAt(mouse.X, mouse.Y)
+	if hitPane != nil {
+		if mouse.Button == tea.MouseWheelUp {
+			hitPane.scrollUp(m.scrollSpeed)
+		} else {
+			hitPane.scrollDown(m.scrollSpeed)
+		}
+		m.selection.Active = false
+	}
+	return m, nil
+}
+
+// clampToPaneCoords converts screen coordinates to pane-relative coordinates,
+// clamped to the pane's inner bounds (inside the border).
+func (m *Manager) clampToPaneCoords(p *Pane, x, y int) (termX, termY int) {
+	termX = x - p.X - 1
+	termY = y - p.Y - 1
+	if termX < 0 {
+		termX = 0
+	}
+	if termY < 0 {
+		termY = 0
+	}
+	if termX >= p.Width {
+		termX = p.Width - 1
+	}
+	if termY >= p.Height {
+		termY = p.Height - 1
+	}
+	return
 }
 
 // selectWord selects the word under the cursor in the given pane.
@@ -671,39 +695,25 @@ func (m *Manager) findPaneAt(x, y int) *Pane {
 	return nil
 }
 
-// translateMouseEvent converts a tea.MouseMsg into VT button and action values.
-// Returns (button, action, ok).
-func (m *Manager) translateMouseEvent(msg tea.MouseMsg) (int, int, bool) {
+// translateMouseButton converts a tea.MouseButton and a terminal action constant
+// into the VT button and action values used by the PTY protocol.
+func (m *Manager) translateMouseButton(btn tea.MouseButton, action int) (int, int) {
 	var button int
-	switch msg.Button {
-	case tea.MouseButtonLeft:
+	switch btn {
+	case tea.MouseLeft:
 		button = terminal.MouseButtonLeft
-	case tea.MouseButtonMiddle:
+	case tea.MouseMiddle:
 		button = terminal.MouseButtonMiddle
-	case tea.MouseButtonRight:
+	case tea.MouseRight:
 		button = terminal.MouseButtonRight
-	case tea.MouseButtonWheelUp:
+	case tea.MouseWheelUp:
 		button = terminal.MouseButtonWheelUp
-	case tea.MouseButtonWheelDown:
+	case tea.MouseWheelDown:
 		button = terminal.MouseButtonWheelDown
 	default:
-		// For motion without a button, use left as default
 		button = terminal.MouseButtonLeft
 	}
-
-	var action int
-	switch msg.Action {
-	case tea.MouseActionPress:
-		action = terminal.MouseActionPress
-	case tea.MouseActionRelease:
-		action = terminal.MouseActionRelease
-	case tea.MouseActionMotion:
-		action = terminal.MouseActionMotion
-	default:
-		return 0, 0, false
-	}
-
-	return button, action, true
+	return button, action
 }
 
 // readPaneCmd returns a tea.Cmd that reads one chunk from a pane's PTY.
@@ -876,10 +886,10 @@ func (m *Manager) renderStatusBar() string {
 	return m.theme.StatusBar.Width(m.width).Render(bar)
 }
 
-// keyToBytes converts a tea.KeyMsg to raw bytes for PTY input.
-func keyToBytes(msg tea.KeyMsg) []byte {
+// keyToBytes converts a tea.KeyPressMsg to raw bytes for PTY input.
+func keyToBytes(msg tea.KeyPressMsg) []byte {
 	// Handle special keys
-	switch msg.Type {
+	switch msg.Code {
 	case tea.KeyEnter:
 		return []byte{'\r'}
 	case tea.KeyTab:
@@ -908,13 +918,16 @@ func keyToBytes(msg tea.KeyMsg) []byte {
 		return []byte("\x1b[3~")
 	case tea.KeySpace:
 		return []byte{' '}
-	case tea.KeyRunes:
-		return []byte(string(msg.Runes))
 	}
 
-	// Control keys (ctrl+a = 0x01, etc.)
-	if msg.Type >= tea.KeyCtrlA && msg.Type <= tea.KeyCtrlZ {
-		return []byte{byte(msg.Type - tea.KeyCtrlA + 1)}
+	// Control keys (ctrl+a = 0x01, ctrl+b = 0x02, etc.)
+	if msg.Mod.Contains(tea.ModCtrl) && msg.Code >= 'a' && msg.Code <= 'z' {
+		return []byte{byte(msg.Code-'a') + 1}
+	}
+
+	// Printable characters
+	if msg.Text != "" {
+		return []byte(msg.Text)
 	}
 
 	return nil

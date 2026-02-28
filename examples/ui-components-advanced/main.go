@@ -5,9 +5,9 @@ import (
 	"io"
 	"os"
 
-	"github.com/charmbracelet/bubbles/list"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/list"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 // Item represents a list item
@@ -84,15 +84,13 @@ func (m Model) Init() tea.Cmd {
 // Update implements tea.Model
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
 		case "enter":
 			if _, ok := m.list.SelectedItem().(Item); ok {
-				return m, tea.Cmd(func() tea.Msg {
-					return tea.Quit()
-				})
+				return m, tea.Quit
 			}
 		}
 	case tea.WindowSizeMsg:
@@ -107,21 +105,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // View implements tea.Model
-func (m Model) View() string {
+func (m Model) View() tea.View {
 	instructions := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#A9B1D6")).
 		Italic(true).
 		Render("\nNavigate with arrow keys, select with Enter, quit with Q")
 
-	return m.list.View() + instructions
+	v := tea.NewView(m.list.View() + instructions)
+	v.AltScreen = true
+	return v
 }
 
 func main() {
 	m := InitialModel()
 
-	p := tea.NewProgram(m,
-		tea.WithAltScreen(),
-	)
+	p := tea.NewProgram(m)
 
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)

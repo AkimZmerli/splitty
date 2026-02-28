@@ -5,15 +5,15 @@ import (
 	"os"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/help"
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/paginator"
-	"github.com/charmbracelet/bubbles/progress"
-	"github.com/charmbracelet/bubbles/spinner"
-	"github.com/charmbracelet/bubbles/textarea"
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/paginator"
+	"charm.land/bubbles/v2/progress"
+	"charm.land/bubbles/v2/spinner"
+	"charm.land/bubbles/v2/textarea"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 // KeyMap defines custom key bindings
@@ -184,7 +184,7 @@ func (m Model) Init() tea.Cmd {
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch {
 		case key.Matches(msg, keys.Quit):
 			return m, tea.Quit
@@ -298,27 +298,29 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) View() string {
+func (m Model) View() tea.View {
+	var content string
 	if m.showHelp {
-		return m.helpView()
+		content = m.helpView()
+	} else {
+		switch m.state {
+		case stateSpinner:
+			content = m.spinnerView()
+		case stateTextInput:
+			content = m.textInputView()
+		case stateTextArea:
+			content = m.textAreaView()
+		case stateProgress:
+			content = m.progressView()
+		case statePaginator:
+			content = m.paginatorView()
+		}
+		content += "\n" + m.footerView()
 	}
 
-	content := ""
-	switch m.state {
-	case stateSpinner:
-		content = m.spinnerView()
-	case stateTextInput:
-		content = m.textInputView()
-	case stateTextArea:
-		content = m.textAreaView()
-	case stateProgress:
-		content = m.progressView()
-	case statePaginator:
-		content = m.paginatorView()
-	}
-
-	footer := m.footerView()
-	return content + "\n" + footer
+	v := tea.NewView(content)
+	v.AltScreen = true
+	return v
 }
 
 func (m Model) spinnerView() string {
@@ -426,10 +428,7 @@ func containerStyle() lipgloss.Style {
 
 func main() {
 	m := NewModel()
-	p := tea.NewProgram(m,
-		tea.WithAltScreen(),
-		tea.WithMouseCellMotion(),
-	)
+	p := tea.NewProgram(m)
 
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)

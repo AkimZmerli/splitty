@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/AkimZmerli/splitty"
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 func main() {
@@ -16,10 +16,7 @@ func main() {
 		splitty.WithStatusBar(true),
 	)
 
-	p := tea.NewProgram(m,
-		tea.WithAltScreen(),
-		tea.WithMouseCellMotion(),
-	)
+	p := tea.NewProgram(m)
 
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)

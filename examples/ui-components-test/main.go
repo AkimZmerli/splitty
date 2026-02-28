@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/charmbracelet/bubbles/spinner"
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/spinner"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 // Model represents the state of the UI test application
@@ -47,7 +47,7 @@ func (m Model) Init() tea.Cmd {
 // Update implements tea.Model
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
@@ -92,7 +92,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // View implements tea.Model
-func (m Model) View() string {
+func (m Model) View() tea.View {
 	s := lipgloss.NewStyle()
 	titleStyle := s.Copy().
 		Bold(true).
@@ -110,11 +110,13 @@ func (m Model) View() string {
 		BorderForeground(lipgloss.Color("63"))
 
 	switch m.step {
+	var rendered string
+	switch m.step {
 	case 0:
 		// Spinner step
 		content := fmt.Sprintf("%s Loading UI Components...\n\n", m.spinner.View())
 		content += instructionStyle.Render("Press Enter to continue")
-		return containerStyle.Render(
+		rendered = containerStyle.Render(
 			titleStyle.Render("🎨 Bubbletea Components Test") + "\n" + content,
 		)
 
@@ -122,7 +124,7 @@ func (m Model) View() string {
 		// Text input step
 		content := fmt.Sprintf("Enter your name:\n%s\n\n", m.textinput.View())
 		content += instructionStyle.Render("Press Enter to submit")
-		return containerStyle.Render(
+		rendered = containerStyle.Render(
 			titleStyle.Render("✏️  Text Input Component") + "\n" + content,
 		)
 
@@ -139,20 +141,20 @@ func (m Model) View() string {
 		content += "  ✓ Style composition with Lipgloss\n\n"
 		content += instructionStyle.Render("Press Enter to restart, or Q to quit")
 
-		return containerStyle.Render(
+		rendered = containerStyle.Render(
 			titleStyle.Render("🎉 Summary") + "\n" + content,
 		)
 	}
 
-	return ""
+	v := tea.NewView(rendered)
+	v.AltScreen = true
+	return v
 }
 
 func main() {
 	m := InitialModel()
 
-	p := tea.NewProgram(m,
-		tea.WithAltScreen(),
-	)
+	p := tea.NewProgram(m)
 
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)

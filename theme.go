@@ -1,6 +1,6 @@
 package splitty
 
-import "github.com/charmbracelet/lipgloss"
+import "charm.land/lipgloss/v2"
 
 // themeEntry pairs a theme with its display name.
 type themeEntry struct {
