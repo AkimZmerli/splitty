@@ -31,6 +31,11 @@ type Screen struct {
 	scrollBottom int
 	title        string
 
+	// Mouse mode tracking
+	mouseMode     int // 0=off, 9=X10, 1000=normal, 1002=button-event, 1003=any-event
+	mouseEncoding int // 0=X10/normal, 1006=SGR
+	altScreen     bool
+
 	// Scrollback buffer (ring buffer)
 	scrollback     [][]Cell  // Ring buffer storage
 	scrollbackSize int       // Max lines (configurable)
@@ -545,9 +550,20 @@ func (s *Screen) parseExtendedColor(params []int, i int, fg bool) int {
 func (s *Screen) handleDECSet(params []int) {
 	for _, p := range params {
 		switch p {
+		case 9: // X10 mouse reporting
+			s.mouseMode = 9
 		case 25: // DECTCEM - show cursor
 			s.cursor.Visible = true
+		case 1000: // Normal mouse tracking
+			s.mouseMode = 1000
+		case 1002: // Button-event tracking
+			s.mouseMode = 1002
+		case 1003: // Any-event tracking
+			s.mouseMode = 1003
+		case 1006: // SGR mouse encoding
+			s.mouseEncoding = 1006
 		case 1049, 47, 1047: // alternate screen buffer
+			s.altScreen = true
 			s.clearScreen()
 		}
 	}
@@ -556,9 +572,14 @@ func (s *Screen) handleDECSet(params []int) {
 func (s *Screen) handleDECReset(params []int) {
 	for _, p := range params {
 		switch p {
+		case 9, 1000, 1002, 1003:
+			s.mouseMode = 0
 		case 25:
 			s.cursor.Visible = false
+		case 1006:
+			s.mouseEncoding = 0
 		case 1049, 47, 1047:
+			s.altScreen = false
 			s.clearScreen()
 		}
 	}
@@ -605,12 +626,21 @@ func (s *Screen) reverseIndex() {
 func (s *Screen) scrollUp(n int) {
 	for i := 0; i < n; i++ {
 		// Save the line being scrolled off to the scrollback buffer
-		if s.scrollbackSize > 0 && s.scrollTop == 0 {
+		if s.scrollbackSize > 0 && s.scrollTop == 0 && !s.altScreen {
 			topLine := s.copyLine(s.cells[0])
 			s.scrollback[s.scrollbackHead] = topLine
 			s.scrollbackHead = (s.scrollbackHead + 1) % s.scrollbackSize
 			if s.scrollbackLen < s.scrollbackSize {
 				s.scrollbackLen++
+			}
+
+			// Stabilize view: if user is scrolled back, increment offset
+			// so the viewed content stays in place as new lines arrive.
+			if s.viewOffset > 0 {
+				s.viewOffset++
+				if s.viewOffset > s.scrollbackLen {
+					s.viewOffset = s.scrollbackLen
+				}
 			}
 		}
 
@@ -811,6 +841,160 @@ func (s *Screen) IsScrolledBack() bool {
 	return s.viewOffset > 0
 }
 
+// HasMouseMode returns true if the inner terminal has enabled any mouse tracking mode.
+func (s *Screen) HasMouseMode() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.mouseMode != 0
+}
+
+// MouseMode returns the current mouse tracking mode (0, 9, 1000, 1002, 1003).
+func (s *Screen) MouseMode() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.mouseMode
+}
+
+// MouseEncoding returns the current mouse encoding (0=X10/normal, 1006=SGR).
+func (s *Screen) MouseEncoding() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.mouseEncoding
+}
+
+// IsAltScreen returns true if the alternate screen buffer is active.
+func (s *Screen) IsAltScreen() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.altScreen
+}
+
+// GetCell returns the cell at the given row and column.
+// Returns an empty cell if coordinates are out of bounds.
+func (s *Screen) GetCell(row, col int) Cell {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if row < 0 || row >= s.height || col < 0 || col >= s.width {
+		return EmptyCell()
+	}
+	return s.cells[row][col]
+}
+
+// GetText extracts text from the cell grid between the given coordinates (inclusive).
+// Coordinates are 0-based. Lines are joined with newlines; trailing spaces per line are trimmed.
+func (s *Screen) GetText(startRow, startCol, endRow, endCol int) string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if startRow > endRow || (startRow == endRow && startCol > endCol) {
+		startRow, startCol, endRow, endCol = endRow, endCol, startRow, startCol
+	}
+
+	var buf strings.Builder
+	for row := startRow; row <= endRow && row < s.height; row++ {
+		if row < 0 {
+			continue
+		}
+		colStart := 0
+		colEnd := s.width - 1
+		if row == startRow {
+			colStart = startCol
+		}
+		if row == endRow {
+			colEnd = endCol
+		}
+		if colStart < 0 {
+			colStart = 0
+		}
+		if colEnd >= s.width {
+			colEnd = s.width - 1
+		}
+
+		if row > startRow {
+			buf.WriteByte('\n')
+		}
+
+		// Collect the line and trim trailing spaces
+		var line strings.Builder
+		lastNonSpace := -1
+		for col := colStart; col <= colEnd; col++ {
+			r := s.cells[row][col].Rune
+			if r == 0 {
+				r = ' '
+			}
+			line.WriteRune(r)
+			if r != ' ' {
+				lastNonSpace = col - colStart
+			}
+		}
+		text := line.String()
+		if lastNonSpace >= 0 {
+			// Trim trailing spaces by taking up to lastNonSpace+1 runes
+			runes := []rune(text)
+			if lastNonSpace+1 < len(runes) {
+				text = string(runes[:lastNonSpace+1])
+			}
+		} else {
+			text = ""
+		}
+		buf.WriteString(text)
+	}
+	return buf.String()
+}
+
+// GetLine returns all cells in the given row.
+func (s *Screen) GetLine(row int) []Cell {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if row < 0 || row >= s.height {
+		return nil
+	}
+	line := make([]Cell, s.width)
+	copy(line, s.cells[row])
+	return line
+}
+
+// SearchText searches current cells and scrollback for the given string.
+// Returns a list of matches as (row, col) pairs. Row coordinates are relative
+// to the current view (negative rows are in scrollback).
+func (s *Screen) SearchText(query string) [][2]int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if query == "" {
+		return nil
+	}
+
+	var matches [][2]int
+
+	// Search current cells
+	for row := 0; row < s.height; row++ {
+		lineText := s.lineToString(s.cells[row])
+		for idx := 0; idx < len(lineText); {
+			pos := strings.Index(lineText[idx:], query)
+			if pos < 0 {
+				break
+			}
+			matches = append(matches, [2]int{row, idx + pos})
+			idx += pos + 1
+		}
+	}
+
+	return matches
+}
+
+func (s *Screen) lineToString(line []Cell) string {
+	var buf strings.Builder
+	for _, c := range line {
+		if c.Rune == 0 {
+			buf.WriteByte(' ')
+		} else {
+			buf.WriteRune(c.Rune)
+		}
+	}
+	return buf.String()
+}
+
 func (s *Screen) fullReset() {
 	s.clearScreen()
 	s.cursor = DefaultCursor()
@@ -819,6 +1003,25 @@ func (s *Screen) fullReset() {
 	s.title = ""
 	s.utfBuf = s.utfBuf[:0]
 	s.wrapPending = false
+	s.mouseMode = 0
+	s.mouseEncoding = 0
+	s.altScreen = false
+}
+
+// RenderWithHighlight renders the cell grid with optional per-cell highlighting.
+// Highlighted cells have their Reverse attribute toggled.
+// If highlight is nil, behaves identically to Render().
+func (s *Screen) RenderWithHighlight(highlight [][]bool) string {
+	return s.RenderWithOptions(highlight, false)
+}
+
+// RenderWithOptions renders the cell grid with optional highlighting and cursor display.
+// When showCursor is true and the inner terminal's cursor is visible, the cursor
+// cell is rendered with reverse video (used for the focused pane).
+func (s *Screen) RenderWithOptions(highlight [][]bool, showCursor bool) string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.renderInternal(highlight, showCursor)
 }
 
 // Render converts the cell grid to an ANSI string suitable for display
@@ -826,7 +1029,10 @@ func (s *Screen) fullReset() {
 func (s *Screen) Render() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	return s.renderInternal(nil, false)
+}
 
+func (s *Screen) renderInternal(highlight [][]bool, showCursor bool) string {
 	var buf strings.Builder
 	buf.Grow(s.width * s.height * 2)
 
@@ -840,36 +1046,43 @@ func (s *Screen) Render() string {
 		for col := 0; col < s.width; col++ {
 			var cell Cell
 
-			// Determine which cell to render based on viewOffset
+			// Determine which cell to render based on viewOffset.
+			// The combined virtual buffer is:
+			//   [scrollback oldest..newest] + [cells 0..height-1]
+			// At viewOffset=V, the visible window starts at (scrollbackLen - V).
 			if s.viewOffset > 0 && s.scrollbackLen > 0 {
-				// Show scrollback lines that correspond to this row
-				// We show the oldest viewOffset lines from scrollback
-				linesFromTop := s.viewOffset
-				oldestIdx := (s.scrollbackHead - s.scrollbackLen) % s.scrollbackSize
-				if oldestIdx < 0 {
-					oldestIdx += s.scrollbackSize
-				}
-
-				// For each row, determine if it comes from scrollback or current cells
-				if row < linesFromTop && row < s.scrollbackLen {
-					// This row is within the scrollback view
-					sbIdx := (oldestIdx + row) % s.scrollbackSize
+				combinedIdx := (s.scrollbackLen - s.viewOffset) + row
+				if combinedIdx < 0 {
+					cell = EmptyCell()
+				} else if combinedIdx < s.scrollbackLen {
+					// This row maps to a scrollback line
+					oldestIdx := (s.scrollbackHead - s.scrollbackLen + s.scrollbackSize) % s.scrollbackSize
+					sbIdx := (oldestIdx + combinedIdx) % s.scrollbackSize
 					if s.scrollback[sbIdx] != nil && col < len(s.scrollback[sbIdx]) {
 						cell = s.scrollback[sbIdx][col]
 					} else {
 						cell = EmptyCell()
 					}
 				} else {
-					// Show current cells
-					cell = s.cells[row][col]
+					// This row maps to a current cell line
+					cellRow := combinedIdx - s.scrollbackLen
+					if cellRow >= 0 && cellRow < s.height {
+						cell = s.cells[cellRow][col]
+					} else {
+						cell = EmptyCell()
+					}
 				}
 			} else {
-				// Normal rendering from cells
 				cell = s.cells[row][col]
 			}
 
 			renderStyle := cell.Style
-			if s.cursor.Visible && s.viewOffset == 0 && row == s.cursor.Row && col == s.cursor.Col {
+			// Show cursor as reverse-video block when this pane is focused
+			if showCursor && s.cursor.Visible && s.viewOffset == 0 && row == s.cursor.Row && col == s.cursor.Col {
+				renderStyle.Reverse = !renderStyle.Reverse
+			}
+			// Apply selection highlight
+			if highlight != nil && row < len(highlight) && col < len(highlight[row]) && highlight[row][col] {
 				renderStyle.Reverse = !renderStyle.Reverse
 			}
 			if first || !renderStyle.Equal(prevStyle) {

@@ -5,15 +5,15 @@ import (
 	"os"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/help"
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/paginator"
-	"github.com/charmbracelet/bubbles/progress"
-	"github.com/charmbracelet/bubbles/spinner"
-	"github.com/charmbracelet/bubbles/textarea"
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/paginator"
+	"charm.land/bubbles/v2/progress"
+	"charm.land/bubbles/v2/spinner"
+	"charm.land/bubbles/v2/textarea"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 // KeyMap defines custom key bindings
@@ -118,17 +118,17 @@ func NewModel() Model {
 	inputs[0] = textinput.New()
 	inputs[0].Placeholder = "Name"
 	inputs[0].CharLimit = 30
-	inputs[0].Width = 30
+	inputs[0].SetWidth(30)
 
 	inputs[1] = textinput.New()
 	inputs[1].Placeholder = "Email"
 	inputs[1].CharLimit = 50
-	inputs[1].Width = 30
+	inputs[1].SetWidth(30)
 
 	inputs[2] = textinput.New()
 	inputs[2].Placeholder = "Message"
 	inputs[2].CharLimit = 100
-	inputs[2].Width = 30
+	inputs[2].SetWidth(30)
 
 	// Initialize text area
 	ta := textarea.New()
@@ -139,7 +139,7 @@ func NewModel() Model {
 
 	// Initialize progress bar
 	prog := progress.New(
-		progress.WithDefaultGradient(),
+		progress.WithDefaultBlend(),
 		progress.WithWidth(30),
 		progress.WithoutPercentage(),
 	)
@@ -184,7 +184,7 @@ func (m Model) Init() tea.Cmd {
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch {
 		case key.Matches(msg, keys.Quit):
 			return m, tea.Quit
@@ -289,8 +289,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case progress.FrameMsg:
 		if m.state == stateProgress {
 			var cmd tea.Cmd
-			model, cmd := m.progress.Update(msg)
-			m.progress = model.(progress.Model)
+			m.progress, cmd = m.progress.Update(msg)
 			return m, cmd
 		}
 	}
@@ -298,27 +297,29 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) View() string {
+func (m Model) View() tea.View {
+	var content string
 	if m.showHelp {
-		return m.helpView()
+		content = m.helpView()
+	} else {
+		switch m.state {
+		case stateSpinner:
+			content = m.spinnerView()
+		case stateTextInput:
+			content = m.textInputView()
+		case stateTextArea:
+			content = m.textAreaView()
+		case stateProgress:
+			content = m.progressView()
+		case statePaginator:
+			content = m.paginatorView()
+		}
+		content += "\n" + m.footerView()
 	}
 
-	content := ""
-	switch m.state {
-	case stateSpinner:
-		content = m.spinnerView()
-	case stateTextInput:
-		content = m.textInputView()
-	case stateTextArea:
-		content = m.textAreaView()
-	case stateProgress:
-		content = m.progressView()
-	case statePaginator:
-		content = m.paginatorView()
-	}
-
-	footer := m.footerView()
-	return content + "\n" + footer
+	v := tea.NewView(content)
+	v.AltScreen = true
+	return v
 }
 
 func (m Model) spinnerView() string {
@@ -426,10 +427,7 @@ func containerStyle() lipgloss.Style {
 
 func main() {
 	m := NewModel()
-	p := tea.NewProgram(m,
-		tea.WithAltScreen(),
-		tea.WithMouseCellMotion(),
-	)
+	p := tea.NewProgram(m)
 
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/charmbracelet/bubbles/key"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
 	"github.com/AkimZmerli/splitty"
 )
 
@@ -22,10 +22,10 @@ func main() {
 
 	m := splitty.New(
 		splitty.WithKeyMap(keys),
-		splitty.WithTheme(splitty.Dracula),
+		splitty.WithTheme(splitty.Nightshade),
 	)
 
-	p := tea.NewProgram(m, tea.WithAltScreen())
+	p := tea.NewProgram(m)
 
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)

@@ -1,6 +1,6 @@
 package splitty
 
-import tea "github.com/charmbracelet/bubbletea"
+import tea "charm.land/bubbletea/v2"
 
 // Zoom maximizes the focused pane to fill the entire screen.
 func (m *Manager) Zoom() tea.Cmd {

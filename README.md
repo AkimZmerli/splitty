@@ -8,7 +8,7 @@
         |_|                |__/
 ```
 
-### Split pane terminal multiplexing for your Bubble Tea apps
+### The terminal multiplexer built for agentic coding
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/AkimZmerli/splitty.svg)](https://pkg.go.dev/github.com/AkimZmerli/splitty)
 [![Go Report Card](https://goreportcard.com/badge/github.com/AkimZmerli/splitty)](https://goreportcard.com/report/github.com/AkimZmerli/splitty)
@@ -19,34 +19,30 @@
 
 ---
 
-**Splitty** is a standalone Go library that brings full terminal multiplexing to
-[Bubble Tea](https://github.com/charmbracelet/bubbletea) applications. Split,
-navigate, zoom, broadcast, and persist terminal panes -- all without leaving
-your TUI.
+**Splitty** is a Go terminal multiplexer built on [Bubble Tea](https://github.com/charmbracelet/bubbletea) with one guiding principle: **your left hand never leaves home row.**
 
-Think of it as tmux that lives *inside* your Go program.
+Navigate panes with `Ctrl+W/A/S/D` -- the same muscle memory you use in games. When you're running 3 AI agents in parallel and need to check on each one, movement should feel instant and familiar. Not `Ctrl+B` then arrow keys. Not clicking tabs. Just WASD.
 
-## Highlights
+Built for the era of agentic coding, where developers orchestrate multiple AI sessions simultaneously and **observability across panes is everything.**
 
-- **Binary tree layout engine** -- split any pane vertically or horizontally, infinitely deep
-- **5 built-in themes** -- Default, Tokyo Night, Dracula, Nord, and Catppuccin
-- **Vim-style navigation** -- `Ctrl+h/j/k/l` to jump between panes, `Tab` to cycle
-- **Zoom** -- blow up any pane to fullscreen and back with `Ctrl+z`
-- **Broadcast mode** -- type into *every* pane at once (hello, cluster ops)
-- **Layout persistence** -- save and restore your pane arrangements as JSON
-- **Layout presets** -- spin up `single`, `dev`, `triple`, or `quad` layouts in one call
-- **Mouse support** -- click to focus, because sometimes a trackpad just wins
-- **Fully embeddable** -- Splitty is a `tea.Model`; drop it into any Bubble Tea app
+## Why Splitty?
 
-## Installation
+Agentic coding is changing how developers work. You're no longer running one terminal session -- you're watching a code agent, a test runner, and a review agent all working at the same time. You need to:
+
+- **See everything at once** -- split panes with real terminal emulation
+- **Navigate instantly** -- WASD feels like a game, not a chore
+- **Stay in flow** -- left hand navigates, right hand stays on the mouse or keys
+- **Monitor activity** -- know which agent is working and which is waiting
+
+Existing multiplexers (tmux, screen) were built for shell management. Splitty is built for **agent orchestration**.
+
+## Quick Start
 
 ```bash
 go get github.com/AkimZmerli/splitty
 ```
 
-## Quick Start
-
-Ten lines. That's all it takes to get a working split-pane terminal.
+Ten lines to a working multi-pane terminal:
 
 ```go
 package main
@@ -69,38 +65,72 @@ func main() {
 }
 ```
 
-Hit `Ctrl+\` to split vertically. Hit `Ctrl+-` to split horizontally. You are
-now a multiplexer.
+Hit `Ctrl+V` to split vertically. Hit `Ctrl+H` to split horizontally. Navigate with `Ctrl+W/A/S/D`. You're multiplexing.
+
+## Keybindings
+
+The keybindings are designed around left-hand ergonomics. Your hand rests on WASD for navigation, with splitting and management keys within natural reach.
+
+### Navigation (WASD)
+
+| Key | Action |
+|-----|--------|
+| `Ctrl+W` | Focus up |
+| `Ctrl+A` | Focus left |
+| `Ctrl+S` | Focus down |
+| `Ctrl+D` | Focus right |
+| `Tab` | Next pane |
+| `Shift+Tab` | Previous pane |
+
+### Pane Management
+
+| Key | Action |
+|-----|--------|
+| `Ctrl+V` | Split vertical |
+| `Ctrl+H` | Split horizontal |
+| `Ctrl+C` | Close pane |
+| `Ctrl+Z` | Toggle zoom |
+| `Ctrl+X` | Swap panes |
+| `Ctrl+B` | Toggle broadcast |
+| `Ctrl+Shift+Arrow` | Resize pane |
+
+### Scrollback
+
+| Key | Action |
+|-----|--------|
+| `Ctrl+K` | Scroll up |
+| `Ctrl+J` | Scroll down |
+| `Ctrl+U` | Page up |
+| `Ctrl+N` | Page down |
+| `Ctrl+Home` | Scroll to top |
+| `Ctrl+End` | Scroll to bottom |
+
+All keybindings are fully customizable:
+
+```go
+km := splitty.DefaultKeyMap()
+km.FocusUp = key.NewBinding(key.WithKeys("ctrl+w"))
+splitty.New(splitty.WithKeyMap(km))
+```
 
 ## Features
 
+### WASD Navigation
+
+The core design decision. Navigate between panes with `Ctrl+W/A/S/D` using the same spatial awareness you use in games. Your left hand stays planted, your right hand stays free. When you're watching 4 agent sessions, switching between them should be reflexive, not a sequence of prefix keys.
+
 ### Splitting
 
-Every pane can be split vertically or horizontally. Under the hood, Splitty
-manages a binary tree of `splitNode` and `leafNode` elements. The split ratio
-defaults to 50/50 and can be resized dynamically.
+Every pane can be split vertically or horizontally. Under the hood, Splitty manages a binary tree of `splitNode` and `leafNode` elements. The split ratio defaults to 50/50 and can be resized dynamically.
 
 ```go
-// Programmatic splitting
 m.Split(splitty.Vertical)
 m.Split(splitty.Horizontal)
 ```
 
-### Navigation
-
-Move between panes with directional focus (vim-style `h/j/k/l`) or cycle
-through them sequentially with `Tab` and `Shift+Tab`. Click a pane with the
-mouse to focus it instantly.
-
-```go
-m.Focus(splitty.Vertical)    // move focus along the vertical axis
-m.FocusPane("pane-3")        // jump to a specific pane by ID
-```
-
 ### Themes
 
-Splitty ships with five carefully crafted themes. Each one styles pane borders,
-the status bar, dividers, and zoom/broadcast indicators.
+Five built-in themes. Each one styles pane borders, the status bar, dividers, and zoom/broadcast indicators.
 
 ```go
 splitty.New(splitty.WithTheme(splitty.Dracula))
@@ -114,8 +144,7 @@ splitty.New(splitty.WithTheme(splitty.Dracula))
 | `Nord` | Arctic, icy, Scandinavian calm |
 | `Catppuccin` | Warm pastels on deep mocha |
 
-You can also define your own `splitty.Theme` struct for full control over every
-style.
+Define your own `splitty.Theme` struct for full control over every style.
 
 ### Presets
 
@@ -128,59 +157,62 @@ splitty.New(splitty.WithPreset(splitty.PresetDev))
 | Preset | Layout |
 |--------|--------|
 | `PresetSingle` | One full-screen pane |
-| `PresetDev` | 60/40 vertical split, right side split horizontally (editor + terminal + logs) |
+| `PresetDev` | 60/40 vertical split, right side split horizontally |
 | `PresetTriple` | Three equal columns |
 | `PresetQuad` | 2x2 grid |
 
-Want something custom? Register your own:
+Register your own:
 
 ```go
-splitty.RegisterPreset("myLayout", func(shell string, env []string, w, h int) splitty.Node { ... })
+splitty.RegisterPreset("agentPair", func(shell string, env []string, w, h int) splitty.Node { ... })
+```
+
+### Scrollback Buffer
+
+Configurable scrollback history per pane. Border color changes to indicate when you're viewing history. Auto-scroll resumes when you return to the bottom.
+
+```go
+splitty.New(splitty.WithScrollbackLines(2000))
 ```
 
 ### Zoom
 
-Temporarily maximize the focused pane to the full terminal size. The rest of
-your layout is preserved in the background -- unzoom to snap right back.
+Temporarily maximize the focused pane to the full terminal size. The rest of your layout is preserved in the background.
 
 ```go
-m.Zoom()       // maximize focused pane
-m.Unzoom()     // restore previous layout
-m.IsZoomed()   // check zoom state
+m.Zoom()
+m.Unzoom()
 ```
 
 ### Broadcast
 
-Flip on broadcast mode and every keystroke goes to *all* panes simultaneously.
-Perfect for running the same command across multiple sessions.
+Broadcast mode sends every keystroke to all panes simultaneously. Run the same command across multiple agent sessions at once.
 
 ```go
 m.SetBroadcast(true)
-m.SendInput([]byte("uptime\n"))    // sent to every pane
-m.IsBroadcasting()                 // check broadcast state
+m.SendInput([]byte("continue\n"))
 ```
 
 ### Persistence
 
-Save your carefully arranged layout to a JSON file and reload it later. Splitty
-persists the tree structure, split ratios, working directories, and shell paths.
-New PTY sessions are spawned on load.
+Save your layout to JSON and reload it later. Splitty persists the tree structure, split ratios, working directories, and shell paths.
 
 ```go
 m.SaveLayout("~/.config/splitty/layout.json")
 m.LoadLayout("~/.config/splitty/layout.json")
 ```
 
+### Mouse Support
+
+Click to focus panes. Scroll wheel for scrollback navigation (3 lines per notch). Because sometimes a trackpad just wins.
+
 ### Embedding
 
-Splitty's `Manager` implements `tea.Model`, so you can embed it inside a larger
-Bubble Tea application. Nest it alongside other models, wrap it in a container,
-or use it as one view in a multi-page TUI.
+Splitty's `Manager` implements `tea.Model`, so you can embed it inside any Bubble Tea application.
 
 ```go
 type App struct {
     splits *splitty.Manager
-    // ... your other models
 }
 
 func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -190,47 +222,22 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 ```
 
-## Default Keybindings
-
-| Key | Action |
-|-----|--------|
-| `Ctrl+\` | Split vertical |
-| `Ctrl+-` | Split horizontal |
-| `Ctrl+w` | Close pane |
-| `Ctrl+h` | Focus left |
-| `Ctrl+j` | Focus down |
-| `Ctrl+k` | Focus up |
-| `Ctrl+l` | Focus right |
-| `Tab` | Next pane |
-| `Shift+Tab` | Previous pane |
-| `Ctrl+z` | Toggle zoom |
-| `Ctrl+x` | Swap panes |
-| `Ctrl+b` | Toggle broadcast |
-| `Ctrl+Shift+Arrow` | Resize pane |
-
-All keybindings are fully customizable via `WithKeyMap`:
-
-```go
-km := splitty.DefaultKeyMap()
-km.SplitVertical = key.NewBinding(key.WithKeys("ctrl+d"))
-splitty.New(splitty.WithKeyMap(km))
-```
-
 ## Configuration
 
-Splitty uses the functional options pattern. Mix and match to taste.
+Functional options pattern. Mix and match.
 
 ```go
 m := splitty.New(
-    splitty.WithShell("/bin/zsh"),              // shell for new panes
-    splitty.WithTheme(splitty.Nord),            // visual theme
-    splitty.WithKeyMap(myKeyMap),               // custom keybindings
-    splitty.WithPreset(splitty.PresetQuad),     // initial layout
-    splitty.WithMinSize(12, 4),                 // minimum pane dimensions
-    splitty.WithStatusBar(true),                // bottom status bar
-    splitty.WithMouse(true),                    // mouse click-to-focus
-    splitty.WithEnv([]string{"TERM=xterm-256color"}), // extra env vars
-    splitty.WithLogger(myLogger),               // charmbracelet/log logger
+    splitty.WithShell("/bin/zsh"),
+    splitty.WithTheme(splitty.Nord),
+    splitty.WithKeyMap(myKeyMap),
+    splitty.WithPreset(splitty.PresetQuad),
+    splitty.WithScrollbackLines(1000),
+    splitty.WithMinSize(12, 4),
+    splitty.WithStatusBar(true),
+    splitty.WithMouse(true),
+    splitty.WithEnv([]string{"TERM=xterm-256color"}),
+    splitty.WithLogger(myLogger),
 )
 ```
 
@@ -278,21 +285,19 @@ The [`examples/`](./examples/) directory contains runnable demos:
 
 ## Architecture
 
-Splitty is organized around a few core concepts:
-
-- **Binary tree layout** -- Every split creates a `splitNode` with two children.
-  Leaves hold `Pane` instances with their own PTY and virtual screen.
-- **PTY management** -- Each pane spawns a real shell process via
-  `creack/pty`, with full ANSI terminal emulation in the `terminal` package.
-- **Bubble Tea integration** -- `Manager` implements `Init`, `Update`, and
-  `View`. All pane I/O flows through the Bubble Tea message loop.
+- **Binary tree layout** -- Every split creates a `splitNode` with two children. Leaves hold `Pane` instances with their own PTY and virtual screen.
+- **PTY management** -- Each pane spawns a real shell process via `creack/pty`, with full ANSI terminal emulation in the `terminal` package.
+- **Bubble Tea integration** -- `Manager` implements `Init`, `Update`, and `View`. All pane I/O flows through the Bubble Tea message loop.
 
 For a deeper dive, see [`ARCHITECTURE.md`](./ARCHITECTURE.md).
 
+## Roadmap
+
+See [`ROADMAP.md`](./ROADMAP.md) for planned features including agent observability, activity indicators, output search, and framework integrations.
+
 ## Contributing
 
-Contributions are welcome and appreciated! Whether it is a bug report, a new
-theme, a feature idea, or a pull request -- all of it helps.
+Contributions are welcome. Whether it is a bug report, a new theme, a feature idea, or a pull request -- all of it helps.
 
 1. Fork the repo
 2. Create a feature branch (`git checkout -b my-feature`)
@@ -309,7 +314,6 @@ Splitty is released under the [MIT License](./LICENSE).
 
 <div align="center">
 
-Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) and an
-unreasonable fondness for split panes.
+Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) for developers who run agents like they play games.
 
 </div>

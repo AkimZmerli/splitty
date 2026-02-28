@@ -5,10 +5,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/textinput"
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/textinput"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 const (
@@ -52,11 +52,11 @@ func NewModel() Model {
 		inputs[i] = textinput.New()
 		inputs[i].Placeholder = field.placeholder
 		inputs[i].CharLimit = 100
-		inputs[i].Width = 40
+		inputs[i].SetWidth(40)
 	}
 	inputs[0].Focus()
 
-	vp := viewport.New(80, 15)
+	vp := viewport.New(viewport.WithWidth(80), viewport.WithHeight(15))
 	vp.Style = lipgloss.NewStyle().Padding(1)
 
 	return Model{
@@ -78,7 +78,7 @@ func (m Model) Init() tea.Cmd {
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "ctrl+c", "esc":
 			return m, tea.Quit
@@ -95,8 +95,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		m.reviewport.Width = msg.Width - 4
-		m.reviewport.Height = msg.Height - 10
+		m.reviewport.SetWidth(msg.Width - 4)
+		m.reviewport.SetHeight(msg.Height - 10)
 		return m, nil
 	}
 
@@ -105,7 +105,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m Model) updateForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "down", "j":
 			m.focusedField = (m.focusedField + 1) % len(m.inputs)
@@ -148,13 +148,13 @@ func (m Model) updateForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m Model) updateReview(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "up", "k":
-			m.reviewport.LineUp(1)
+			m.reviewport.ScrollUp(1)
 			return m, nil
 		case "down", "j":
-			m.reviewport.LineDown(1)
+			m.reviewport.ScrollDown(1)
 			return m, nil
 		case "enter":
 			m.step = stepConfirm
@@ -171,7 +171,7 @@ func (m Model) updateReview(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m Model) updateConfirm(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "left", "h":
 			m.confirmChoice = 0
@@ -219,16 +219,19 @@ func (m *Model) updateReviewContent() {
 	m.reviewport.SetContent(content.String())
 }
 
-func (m Model) View() string {
+func (m Model) View() tea.View {
+	var content string
 	switch m.step {
 	case stepForm:
-		return m.viewForm()
+		content = m.viewForm()
 	case stepReview:
-		return m.viewReview()
+		content = m.viewReview()
 	case stepConfirm:
-		return m.viewConfirm()
+		content = m.viewConfirm()
 	}
-	return ""
+	v := tea.NewView(content)
+	v.AltScreen = true
+	return v
 }
 
 func (m Model) viewForm() string {
@@ -361,9 +364,7 @@ func (m Model) renderButton(label string, focused bool) string {
 
 func main() {
 	m := NewModel()
-	p := tea.NewProgram(m,
-		tea.WithAltScreen(),
-	)
+	p := tea.NewProgram(m)
 
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)

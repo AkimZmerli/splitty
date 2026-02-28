@@ -5,8 +5,8 @@ import (
 	"os"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 type ColorScheme struct {
@@ -26,21 +26,21 @@ var colorSchemes = []ColorScheme{
 		bgColor:        "#1A1B26",
 	},
 	{
-		name:           "Dracula",
+		name:           "Nightshade",
 		primaryColor:   "#BD93F9",
 		secondaryColor: "#44475A",
 		accentColor:    "#FF79C6",
 		bgColor:        "#282A36",
 	},
 	{
-		name:           "Nord",
+		name:           "Glacier",
 		primaryColor:   "#88C0D0",
 		secondaryColor: "#4C566A",
 		accentColor:    "#81A1C1",
 		bgColor:        "#2E3440",
 	},
 	{
-		name:           "Catppuccin",
+		name:           "Sorbet",
 		primaryColor:   "#CBA6F7",
 		secondaryColor: "#585B70",
 		accentColor:    "#F5C2E7",
@@ -77,7 +77,7 @@ func (m Model) Init() tea.Cmd {
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
@@ -98,8 +98,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) View() string {
-	return m.render()
+func (m Model) View() tea.View {
+	v := tea.NewView(m.render())
+	v.AltScreen = true
+	return v
 }
 
 func (m Model) render() string {
@@ -255,9 +257,7 @@ func (m Model) render() string {
 
 func main() {
 	m := NewModel()
-	p := tea.NewProgram(m,
-		tea.WithAltScreen(),
-	)
+	p := tea.NewProgram(m)
 
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)

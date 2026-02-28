@@ -1,13 +1,16 @@
 package splitty
 
 import (
+	"encoding/base64"
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
-	"github.com/charmbracelet/bubbles/key"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"github.com/AkimZmerli/splitty/terminal"
+	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 // Manager is the main Bubble Tea model for split pane terminal multiplexing.
@@ -32,6 +35,7 @@ type Manager struct {
 	mouse           bool
 	presetName      string
 	scrollbackLines int
+	scrollSpeed     int
 
 	// State
 	zoomed       bool
@@ -39,6 +43,25 @@ type Manager struct {
 	preZoomRoot  node
 	broadcasting bool
 	ready        bool
+	themeIndex   int
+
+	// Copy mode state
+	copyMode CopyMode
+
+	// Text selection state
+	selection  Selection
+	lastClickX int
+	lastClickY int
+	clickCount int
+	lastClickT int64 // unix millis
+
+	// Drag-to-resize state
+	dragging       bool
+	dragSplit      *splitNode
+	dragDir        Direction
+	dragOriginX    int
+	dragOriginY    int
+	dragStartRatio float64
 
 	// Context menu
 	menu contextMenu
@@ -59,13 +82,14 @@ func New(opts ...Option) *Manager {
 
 	m := &Manager{
 		shell:           shell,
-		theme:           DefaultTheme,
+		theme:           TokyoNight,
 		keyMap:          DefaultKeyMap(),
 		minWidth:        10,
 		minHeight:       3,
 		statusBar:       true,
 		mouse:           true,
 		scrollbackLines: 1000,
+		scrollSpeed:     3,
 		menu:            newContextMenu(),
 	}
 
@@ -87,12 +111,27 @@ func (m *Manager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		return m.handleWindowSize(msg)
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 
-	case tea.MouseMsg:
+	case tea.MouseClickMsg:
 		if m.mouse {
-			return m.handleMouse(msg)
+			return m.handleMouseClick(msg)
+		}
+
+	case tea.MouseReleaseMsg:
+		if m.mouse {
+			return m.handleMouseRelease(msg)
+		}
+
+	case tea.MouseMotionMsg:
+		if m.mouse {
+			return m.handleMouseMotion(msg)
+		}
+
+	case tea.MouseWheelMsg:
+		if m.mouse {
+			return m.handleMouseWheel(msg)
 		}
 
 	case PaneOutputMsg:
@@ -109,9 +148,11 @@ func (m *Manager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // View renders the current state of all panes.
-func (m *Manager) View() string {
+func (m *Manager) View() tea.View {
 	if m.root == nil {
-		return "Initializing..."
+		v := tea.NewView("Initializing...")
+		v.AltScreen = true
+		return v
 	}
 
 	var content string
@@ -130,7 +171,12 @@ func (m *Manager) View() string {
 		content = m.menu.overlayOnView(content, m.width, m.height, m.theme)
 	}
 
-	return content
+	v := tea.NewView(content)
+	v.AltScreen = true
+	if m.mouse {
+		v.MouseMode = tea.MouseModeCellMotion
+	}
+	return v
 }
 
 func (m *Manager) statusBarHeight() int {
@@ -208,10 +254,10 @@ func (m *Manager) initLayout() (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m *Manager) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *Manager) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// Intercept keys when context menu is visible
 	if m.menu.visible {
-		switch msg.Type {
+		switch msg.Code {
 		case tea.KeyEscape:
 			m.menu.hide()
 			return m, nil
@@ -229,7 +275,17 @@ func (m *Manager) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	// Copy mode intercepts all keys
+	if m.copyMode.Active {
+		keyStr := msg.String()
+		_, cmd := m.handleCopyModeKey(keyStr)
+		return m, cmd
+	}
+
 	switch {
+	case key.Matches(msg, m.keyMap.EnterCopyMode):
+		m.enterCopyMode()
+		return m, nil
 	case key.Matches(msg, m.keyMap.SplitVertical):
 		return m.Split(Vertical)
 	case key.Matches(msg, m.keyMap.SplitHorizontal):
@@ -265,27 +321,36 @@ func (m *Manager) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keyMap.ScrollUp):
 		if p := m.findPane(m.focusedID); p != nil {
 			p.scrollUp(1)
+			m.selection.Active = false
 		}
 	case key.Matches(msg, m.keyMap.ScrollDown):
 		if p := m.findPane(m.focusedID); p != nil {
 			p.scrollDown(1)
+			m.selection.Active = false
 		}
 	case key.Matches(msg, m.keyMap.ScrollPageUp):
 		if p := m.findPane(m.focusedID); p != nil {
 			p.scrollUp(p.Height / 2)
+			m.selection.Active = false
 		}
 	case key.Matches(msg, m.keyMap.ScrollPageDown):
 		if p := m.findPane(m.focusedID); p != nil {
 			p.scrollDown(p.Height / 2)
+			m.selection.Active = false
 		}
 	case key.Matches(msg, m.keyMap.ScrollToTop):
 		if p := m.findPane(m.focusedID); p != nil {
 			p.scrollUp(999999)
+			m.selection.Active = false
 		}
 	case key.Matches(msg, m.keyMap.ScrollToBottom):
 		if p := m.findPane(m.focusedID); p != nil {
 			p.resetScroll()
+			m.selection.Active = false
 		}
+	case key.Matches(msg, m.keyMap.CycleTheme):
+		m.themeIndex = (m.themeIndex + 1) % len(themeList)
+		m.theme = themeList[m.themeIndex].Theme
 	default:
 		// Forward keystrokes to pane(s)
 		data := keyToBytes(msg)
@@ -296,79 +361,359 @@ func (m *Manager) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *Manager) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+func (m *Manager) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
+	mouse := msg.Mouse()
+	x, y := mouse.X, mouse.Y
+
 	// Context menu interactions
 	if m.menu.visible {
 		contentH := m.statusBarHeight()
-		switch {
-		case msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft:
-			if m.menu.hitTest(msg.X, msg.Y, m.width, contentH) {
-				idx := m.menu.hitTestItem(msg.X, msg.Y, m.width, contentH)
-				if idx >= 0 {
-					m.menu.selected = idx
-					return m.executeMenuAction()
-				}
-				return m, nil
-			}
-			// Click outside — dismiss menu
-			m.menu.hide()
-			return m, nil
-
-		case msg.Action == tea.MouseActionMotion:
-			idx := m.menu.hitTestItem(msg.X, msg.Y, m.width, contentH)
+		if m.menu.hitTest(x, y, m.width, contentH) {
+			idx := m.menu.hitTestItem(x, y, m.width, contentH)
 			if idx >= 0 {
 				m.menu.selected = idx
+				return m.executeMenuAction()
 			}
 			return m, nil
 		}
+		// Click outside — dismiss menu
+		m.menu.hide()
 		return m, nil
 	}
 
-	// Mouse wheel scrolling
-	if msg.Action == tea.MouseActionPress && (msg.Button == tea.MouseButtonWheelUp || msg.Button == tea.MouseButtonWheelDown) {
-		leaves := m.root.leaves()
-		for _, leaf := range leaves {
-			p := leaf.pane
-			if msg.X >= p.X && msg.X < p.X+p.Width &&
-				msg.Y >= p.Y && msg.Y < p.Y+p.Height {
-				if msg.Button == tea.MouseButtonWheelUp {
-					p.scrollUp(3)
-				} else {
-					p.scrollDown(3)
-				}
-				return m, nil
-			}
+	// Check for border click to start drag (not while zoomed, left button only)
+	if mouse.Button == tea.MouseLeft && !m.zoomed {
+		h := m.statusBarHeight()
+		if sn := findBorder(m.root, x, y, m.width, h); sn != nil {
+			m.dragging = true
+			m.dragSplit = sn
+			m.dragDir = sn.dir
+			m.dragOriginX = x
+			m.dragOriginY = y
+			m.dragStartRatio = sn.ratio
+			return m, nil
 		}
+	}
+
+	// Find the pane under the mouse cursor
+	hitPane := m.findPaneAt(x, y)
+
+	// If the pane has mouse mode and Shift is not held, forward press to PTY
+	if hitPane != nil && hitPane.hasMouseMode() && !mouse.Mod.Contains(tea.ModShift) {
+		button, action := m.translateMouseButton(mouse.Button, terminal.MouseActionPress)
+		termX, termY := m.clampToPaneCoords(hitPane, x, y)
+		hitPane.forwardMouse(button, action, termX, termY)
+		m.focusedID = hitPane.ID
 		return m, nil
 	}
 
 	// Right-click: show context menu (not while zoomed)
-	if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonRight && !m.zoomed {
-		leaves := m.root.leaves()
-		for _, leaf := range leaves {
-			p := leaf.pane
-			if msg.X >= p.X && msg.X < p.X+p.Width &&
-				msg.Y >= p.Y && msg.Y < p.Y+p.Height {
-				m.focusedID = p.ID
-				m.menu.show(msg.X, msg.Y, p.ID)
-				return m, nil
-			}
+	if mouse.Button == tea.MouseRight && !m.zoomed {
+		if hitPane != nil {
+			m.focusedID = hitPane.ID
+			m.menu.show(x, y, hitPane.ID)
 		}
+		return m, nil
 	}
 
-	// Left-click to focus: find which pane was clicked
-	if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft {
-		leaves := m.root.leaves()
-		for _, leaf := range leaves {
-			p := leaf.pane
-			if msg.X >= p.X && msg.X < p.X+p.Width &&
-				msg.Y >= p.Y && msg.Y < p.Y+p.Height {
-				m.focusedID = p.ID
-				break
+	// Left-click: focus + selection
+	if mouse.Button == tea.MouseLeft {
+		if hitPane != nil {
+			m.focusedID = hitPane.ID
+			termX, termY := m.clampToPaneCoords(hitPane, x, y)
+
+			// Multi-click detection
+			now := time.Now().UnixMilli()
+			if x == m.lastClickX && y == m.lastClickY && now-m.lastClickT < 500 {
+				m.clickCount++
+				if m.clickCount > 3 {
+					m.clickCount = 1
+				}
+			} else {
+				m.clickCount = 1
+			}
+			m.lastClickX = x
+			m.lastClickY = y
+			m.lastClickT = now
+
+			switch m.clickCount {
+			case 1:
+				m.selection = Selection{
+					Active:   true,
+					Mode:     SelectChar,
+					PaneID:   hitPane.ID,
+					StartRow: termY,
+					StartCol: termX,
+					EndRow:   termY,
+					EndCol:   termX,
+				}
+			case 2:
+				m.selectWord(hitPane, termX, termY)
+			case 3:
+				m.selection = Selection{
+					Active:   true,
+					Mode:     SelectLine,
+					PaneID:   hitPane.ID,
+					StartRow: termY,
+					StartCol: 0,
+					EndRow:   termY,
+					EndCol:   hitPane.Width - 1,
+				}
+			}
+		} else {
+			m.selection.Active = false
+		}
+		return m, nil
+	}
+
+	return m, nil
+}
+
+func (m *Manager) handleMouseRelease(msg tea.MouseReleaseMsg) (tea.Model, tea.Cmd) {
+	mouse := msg.Mouse()
+
+	// Stop drag
+	if m.dragging {
+		m.dragging = false
+		m.dragSplit = nil
+		return m, nil
+	}
+
+	// If the pane has mouse mode and Shift is not held, forward release to PTY
+	hitPane := m.findPaneAt(mouse.X, mouse.Y)
+	if hitPane != nil && hitPane.hasMouseMode() && !mouse.Mod.Contains(tea.ModShift) {
+		button, action := m.translateMouseButton(mouse.Button, terminal.MouseActionRelease)
+		termX, termY := m.clampToPaneCoords(hitPane, mouse.X, mouse.Y)
+		hitPane.forwardMouse(button, action, termX, termY)
+		return m, nil
+	}
+
+	// Copy selection to clipboard (only if actually selected text)
+	if m.selection.Active {
+		sr, sc, er, ec := m.selection.Normalize()
+		if sr != er || sc != ec {
+			cmd := m.copySelectionToClipboard()
+			return m, cmd
+		}
+		m.selection.Active = false
+	}
+	return m, nil
+}
+
+func (m *Manager) handleMouseMotion(msg tea.MouseMotionMsg) (tea.Model, tea.Cmd) {
+	mouse := msg.Mouse()
+	x, y := mouse.X, mouse.Y
+
+	// Context menu hover
+	if m.menu.visible {
+		contentH := m.statusBarHeight()
+		idx := m.menu.hitTestItem(x, y, m.width, contentH)
+		if idx >= 0 {
+			m.menu.selected = idx
+		}
+		return m, nil
+	}
+
+	// Drag-to-resize
+	if m.dragging {
+		h := m.statusBarHeight()
+		if m.dragDir == Vertical {
+			m.dragSplit.ratio = clampRatio(float64(x) / float64(m.width))
+		} else {
+			m.dragSplit.ratio = clampRatio(float64(y) / float64(h))
+		}
+		m.layoutAll()
+		return m, nil
+	}
+
+	// If the pane has mouse mode and Shift is not held, forward motion to PTY
+	hitPane := m.findPaneAt(x, y)
+	if hitPane != nil && hitPane.hasMouseMode() && !mouse.Mod.Contains(tea.ModShift) {
+		button, action := m.translateMouseButton(mouse.Button, terminal.MouseActionMotion)
+		termX, termY := m.clampToPaneCoords(hitPane, x, y)
+		hitPane.forwardMouse(button, action, termX, termY)
+		return m, nil
+	}
+
+	// Extend char selection (left button held during drag)
+	if mouse.Button == tea.MouseLeft {
+		if m.selection.Active && m.selection.Mode == SelectChar {
+			if p := m.findPane(m.selection.PaneID); p != nil {
+				termX, termY := m.clampToPaneCoords(p, x, y)
+				m.selection.EndRow = termY
+				m.selection.EndCol = termX
 			}
 		}
 	}
 	return m, nil
+}
+
+func (m *Manager) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
+	if m.menu.visible {
+		return m, nil
+	}
+	mouse := msg.Mouse()
+	hitPane := m.findPaneAt(mouse.X, mouse.Y)
+	if hitPane != nil {
+		if mouse.Button == tea.MouseWheelUp {
+			hitPane.scrollUp(m.scrollSpeed)
+		} else {
+			hitPane.scrollDown(m.scrollSpeed)
+		}
+		m.selection.Active = false
+	}
+	return m, nil
+}
+
+// clampToPaneCoords converts screen coordinates to pane-relative coordinates,
+// clamped to the pane's inner bounds (inside the border).
+func (m *Manager) clampToPaneCoords(p *Pane, x, y int) (termX, termY int) {
+	termX = x - p.X - 1
+	termY = y - p.Y - 1
+	if termX < 0 {
+		termX = 0
+	}
+	if termY < 0 {
+		termY = 0
+	}
+	if termX >= p.Width {
+		termX = p.Width - 1
+	}
+	if termY >= p.Height {
+		termY = p.Height - 1
+	}
+	return
+}
+
+// selectWord selects the word under the cursor in the given pane.
+func (m *Manager) selectWord(p *Pane, col, row int) {
+	cell := p.screen.GetCell(row, col)
+	r := cell.Rune
+	if r == 0 {
+		r = ' '
+	}
+
+	// Find word boundaries
+	startCol := col
+	endCol := col
+
+	if isWordChar(r) {
+		// Expand left
+		for startCol > 0 {
+			c := p.screen.GetCell(row, startCol-1)
+			cr := c.Rune
+			if cr == 0 {
+				cr = ' '
+			}
+			if !isWordChar(cr) {
+				break
+			}
+			startCol--
+		}
+		// Expand right
+		for endCol < p.Width-1 {
+			c := p.screen.GetCell(row, endCol+1)
+			cr := c.Rune
+			if cr == 0 {
+				cr = ' '
+			}
+			if !isWordChar(cr) {
+				break
+			}
+			endCol++
+		}
+	}
+
+	m.selection = Selection{
+		Active:   true,
+		Mode:     SelectWord,
+		PaneID:   p.ID,
+		StartRow: row,
+		StartCol: startCol,
+		EndRow:   row,
+		EndCol:   endCol,
+	}
+}
+
+// copySelectionToClipboard copies the selected text via OSC 52.
+// Returns a tea.Cmd to write the escape sequence to the outer terminal.
+func (m *Manager) copySelectionToClipboard() tea.Cmd {
+	if !m.selection.Active {
+		return nil
+	}
+	p := m.findPane(m.selection.PaneID)
+	if p == nil {
+		return nil
+	}
+	sr, sc, er, ec := m.selection.Normalize()
+	text := p.screen.GetText(sr, sc, er, ec)
+	if text == "" {
+		return nil
+	}
+
+	// OSC 52 clipboard: \x1b]52;c;<base64>\x07
+	encoded := base64.StdEncoding.EncodeToString([]byte(text))
+	osc52 := fmt.Sprintf("\x1b]52;c;%s\x07", encoded)
+
+	return func() tea.Msg {
+		// Write OSC 52 directly to the outer terminal
+		os.Stdout.WriteString(osc52)
+		return nil
+	}
+}
+
+// isPaneAdjacentToDrag returns true if the pane is a direct child of the drag split.
+func (m *Manager) isPaneAdjacentToDrag(p *Pane) bool {
+	if m.dragSplit == nil {
+		return false
+	}
+	for _, leaf := range m.dragSplit.first.leaves() {
+		if leaf.pane == p {
+			return true
+		}
+	}
+	for _, leaf := range m.dragSplit.second.leaves() {
+		if leaf.pane == p {
+			return true
+		}
+	}
+	return false
+}
+
+// findPaneAt returns the pane at the given screen coordinates, or nil.
+func (m *Manager) findPaneAt(x, y int) *Pane {
+	if m.root == nil {
+		return nil
+	}
+	for _, leaf := range m.root.leaves() {
+		p := leaf.pane
+		if x >= p.X && x < p.X+p.Width+2 && // +2 for border
+			y >= p.Y && y < p.Y+p.Height+2 {
+			return p
+		}
+	}
+	return nil
+}
+
+// translateMouseButton converts a tea.MouseButton and a terminal action constant
+// into the VT button and action values used by the PTY protocol.
+func (m *Manager) translateMouseButton(btn tea.MouseButton, action int) (int, int) {
+	var button int
+	switch btn {
+	case tea.MouseLeft:
+		button = terminal.MouseButtonLeft
+	case tea.MouseMiddle:
+		button = terminal.MouseButtonMiddle
+	case tea.MouseRight:
+		button = terminal.MouseButtonRight
+	case tea.MouseWheelUp:
+		button = terminal.MouseButtonWheelUp
+	case tea.MouseWheelDown:
+		button = terminal.MouseButtonWheelDown
+	default:
+		button = terminal.MouseButtonLeft
+	}
+	return button, action
 }
 
 // readPaneCmd returns a tea.Cmd that reads one chunk from a pane's PTY.
@@ -412,11 +757,28 @@ func (m *Manager) renderNode(n node, width, height int) string {
 }
 
 func (m *Manager) renderPane(p *Pane, width, height int) string {
-	content := p.render()
+	focused := p.ID == m.focusedID
+	var content string
+	if m.copyMode.Active && m.copyMode.PaneID == p.ID {
+		highlight := m.getCopyModeHighlight(p)
+		content = p.screen.RenderWithHighlight(highlight)
+	} else if m.selection.Active && m.selection.PaneID == p.ID {
+		content = p.renderWithSelection(&m.selection)
+	} else {
+		content = p.screen.RenderWithOptions(nil, focused)
+	}
 	var style lipgloss.Style
 
-	// Determine border style based on scrollback state
-	if p.isScrolledBack() {
+	// Copy mode border
+	if m.copyMode.Active && m.copyMode.PaneID == p.ID {
+		if p.ID == m.focusedID {
+			style = m.theme.BorderCopyModeFocused
+		} else {
+			style = m.theme.BorderCopyMode
+		}
+	} else if m.dragging && m.dragSplit != nil && m.isPaneAdjacentToDrag(p) {
+		style = m.theme.BorderResize
+	} else if p.isScrolledBack() {
 		if p.ID == m.focusedID {
 			style = m.theme.BorderScrollbackFocused
 		} else {
@@ -489,7 +851,7 @@ func (m *Manager) renderStatusBar() string {
 	var parts []string
 	parts = append(parts, "Ctrl+v split")
 	parts = append(parts, "Ctrl+h hsplit")
-	parts = append(parts, "Ctrl+c close")
+	parts = append(parts, "Ctrl+q close")
 	parts = append(parts, "Ctrl+wasd nav")
 
 	if m.zoomed {
@@ -498,9 +860,23 @@ func (m *Manager) renderStatusBar() string {
 	if m.broadcasting {
 		parts = append(parts, m.theme.BroadcastIndicator)
 	}
+	if m.copyMode.Active {
+		indicator := "[COPY]"
+		if m.copyMode.Searching {
+			if m.copyMode.SearchFwd {
+				indicator = fmt.Sprintf("[COPY /%-10s]", m.copyMode.SearchBuf)
+			} else {
+				indicator = fmt.Sprintf("[COPY ?%-10s]", m.copyMode.SearchBuf)
+			}
+		} else if m.copyMode.Visual {
+			indicator = "[COPY VISUAL]"
+		}
+		parts = append(parts, indicator)
+	}
 
 	left := strings.Join(parts, "  ")
-	right := fmt.Sprintf("Pane %d/%d", idx, paneCount)
+	themeName := themeList[m.themeIndex].Name
+	right := fmt.Sprintf("%s  Pane %d/%d", themeName, idx, paneCount)
 
 	gap := m.width - lipgloss.Width(left) - lipgloss.Width(right) - 2
 	if gap < 0 {
@@ -510,10 +886,10 @@ func (m *Manager) renderStatusBar() string {
 	return m.theme.StatusBar.Width(m.width).Render(bar)
 }
 
-// keyToBytes converts a tea.KeyMsg to raw bytes for PTY input.
-func keyToBytes(msg tea.KeyMsg) []byte {
+// keyToBytes converts a tea.KeyPressMsg to raw bytes for PTY input.
+func keyToBytes(msg tea.KeyPressMsg) []byte {
 	// Handle special keys
-	switch msg.Type {
+	switch msg.Code {
 	case tea.KeyEnter:
 		return []byte{'\r'}
 	case tea.KeyTab:
@@ -542,13 +918,16 @@ func keyToBytes(msg tea.KeyMsg) []byte {
 		return []byte("\x1b[3~")
 	case tea.KeySpace:
 		return []byte{' '}
-	case tea.KeyRunes:
-		return []byte(string(msg.Runes))
 	}
 
-	// Control keys (ctrl+a = 0x01, etc.)
-	if msg.Type >= tea.KeyCtrlA && msg.Type <= tea.KeyCtrlZ {
-		return []byte{byte(msg.Type - tea.KeyCtrlA + 1)}
+	// Control keys (ctrl+a = 0x01, ctrl+b = 0x02, etc.)
+	if msg.Mod.Contains(tea.ModCtrl) && msg.Code >= 'a' && msg.Code <= 'z' {
+		return []byte{byte(msg.Code-'a') + 1}
+	}
+
+	// Printable characters
+	if msg.Text != "" {
+		return []byte(msg.Text)
 	}
 
 	return nil

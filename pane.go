@@ -90,6 +90,23 @@ func (p *Pane) render() string {
 	return p.screen.Render()
 }
 
+// renderWithSelection renders the pane with selection highlighting.
+func (p *Pane) renderWithSelection(sel *Selection) string {
+	if sel == nil || !sel.Active || sel.PaneID != p.ID {
+		return p.screen.Render()
+	}
+
+	// Build highlight grid
+	highlight := make([][]bool, p.Height)
+	for row := 0; row < p.Height; row++ {
+		highlight[row] = make([]bool, p.Width)
+		for col := 0; col < p.Width; col++ {
+			highlight[row][col] = sel.Contains(row, col)
+		}
+	}
+	return p.screen.RenderWithHighlight(highlight)
+}
+
 // scrollUp scrolls the view backward into history.
 func (p *Pane) scrollUp(lines int) {
 	p.screen.ScrollViewUp(lines)
@@ -113,4 +130,19 @@ func (p *Pane) resetScroll() {
 // isScrolledBack returns true if the pane is viewing history.
 func (p *Pane) isScrolledBack() bool {
 	return p.screen.IsScrolledBack()
+}
+
+// hasMouseMode returns true if the inner terminal has enabled mouse tracking.
+func (p *Pane) hasMouseMode() bool {
+	return p.screen.HasMouseMode()
+}
+
+// forwardMouse encodes a mouse event and writes it to the pane's PTY.
+func (p *Pane) forwardMouse(button, action, relX, relY int) {
+	if p.pty == nil || p.closed {
+		return
+	}
+	encoding := p.screen.MouseEncoding()
+	data := terminal.EncodeMouseEvent(button, action, relX, relY, encoding)
+	_, _ = p.pty.Write(data)
 }

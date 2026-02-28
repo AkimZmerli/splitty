@@ -1,6 +1,6 @@
 package splitty
 
-import "github.com/charmbracelet/bubbles/key"
+import "charm.land/bubbles/v2/key"
 
 // KeyMap defines all keybindings for split pane operations.
 type KeyMap struct {
@@ -26,6 +26,8 @@ type KeyMap struct {
 	ScrollPageDown  key.Binding
 	ScrollToTop     key.Binding
 	ScrollToBottom  key.Binding
+	CycleTheme      key.Binding
+	EnterCopyMode   key.Binding
 }
 
 // DefaultKeyMap returns the default keybindings for split pane operations.
@@ -36,12 +38,12 @@ func DefaultKeyMap() KeyMap {
 			key.WithHelp("ctrl+v", "split vertical"),
 		),
 		SplitHorizontal: key.NewBinding(
-			key.WithKeys("ctrl+h"),
-			key.WithHelp("ctrl+h", "split horizontal"),
+			key.WithKeys("ctrl+c"),
+			key.WithHelp("ctrl+c", "split horizontal"),
 		),
 		Close: key.NewBinding(
-			key.WithKeys("ctrl+c"),
-			key.WithHelp("ctrl+c", "close pane"),
+			key.WithKeys("ctrl+q"),
+			key.WithHelp("ctrl+q", "close pane"),
 		),
 		FocusLeft: key.NewBinding(
 			key.WithKeys("ctrl+a"),
@@ -60,12 +62,12 @@ func DefaultKeyMap() KeyMap {
 			key.WithHelp("ctrl+d", "focus right"),
 		),
 		FocusCycle: key.NewBinding(
-			key.WithKeys("tab"),
-			key.WithHelp("tab", "next pane"),
+			key.WithKeys("ctrl+tab"),
+			key.WithHelp("ctrl+tab", "next pane"),
 		),
 		FocusCycleBack: key.NewBinding(
-			key.WithKeys("shift+tab"),
-			key.WithHelp("shift+tab", "prev pane"),
+			key.WithKeys("ctrl+shift+tab"),
+			key.WithHelp("ctrl+shift+tab", "prev pane"),
 		),
 		Zoom: key.NewBinding(
 			key.WithKeys("ctrl+z"),
@@ -118,6 +120,14 @@ func DefaultKeyMap() KeyMap {
 		ScrollToBottom: key.NewBinding(
 			key.WithKeys("ctrl+end"),
 			key.WithHelp("ctrl+end", "scroll to bottom"),
+		),
+		CycleTheme: key.NewBinding(
+			key.WithKeys("ctrl+t"),
+			key.WithHelp("ctrl+t", "cycle theme"),
+		),
+		EnterCopyMode: key.NewBinding(
+			key.WithKeys("ctrl+["),
+			key.WithHelp("ctrl+[", "copy mode"),
 		),
 	}
 }

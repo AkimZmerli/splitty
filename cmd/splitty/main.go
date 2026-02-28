@@ -4,12 +4,17 @@ import (
 	"fmt"
 	"os"
 
-	tea "charm.land/bubbletea/v2"
 	"github.com/AkimZmerli/splitty"
+	tea "charm.land/bubbletea/v2"
 )
 
 func main() {
-	m := splitty.New()
+	m := splitty.New(
+		splitty.WithTheme(splitty.TokyoNight),
+		splitty.WithScrollbackLines(1000),
+		splitty.WithMouse(true),
+		splitty.WithStatusBar(true),
+	)
 
 	p := tea.NewProgram(m)
 

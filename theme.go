@@ -1,6 +1,20 @@
 package splitty
 
-import "github.com/charmbracelet/lipgloss"
+import "charm.land/lipgloss/v2"
+
+// themeEntry pairs a theme with its display name.
+type themeEntry struct {
+	Name  string
+	Theme Theme
+}
+
+// themeList is the ordered list of built-in themes for cycling.
+var themeList = []themeEntry{
+	{"Tokyo Night", TokyoNight},
+	{"Nightshade", Nightshade},
+	{"Glacier", Glacier},
+	{"Sorbet", Sorbet},
+}
 
 // Theme defines the visual styling for split panes.
 type Theme struct {
@@ -8,6 +22,9 @@ type Theme struct {
 	BorderInactive         lipgloss.Style
 	BorderScrollback       lipgloss.Style
 	BorderScrollbackFocused lipgloss.Style
+	BorderResize           lipgloss.Style
+	BorderCopyMode         lipgloss.Style
+	BorderCopyModeFocused  lipgloss.Style
 	Divider                lipgloss.Style
 	DividerChar            string
 	StatusBar              lipgloss.Style
@@ -30,6 +47,15 @@ var DefaultTheme = Theme{
 	BorderScrollbackFocused: lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("214")),
+	BorderResize: lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("44")),
+	BorderCopyMode: lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("76")),
+	BorderCopyModeFocused: lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("118")),
 	Divider: lipgloss.NewStyle().
 		Foreground(lipgloss.Color("240")),
 	DividerChar: "│",
@@ -57,6 +83,15 @@ var TokyoNight = Theme{
 	BorderScrollbackFocused: lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("#FF9E64")),
+	BorderResize: lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#2AC3DE")),
+	BorderCopyMode: lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#73DACA")),
+	BorderCopyModeFocused: lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#9ECE6A")),
 	Divider: lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#565F89")),
 	DividerChar: "│",
@@ -70,8 +105,8 @@ var TokyoNight = Theme{
 	BroadcastIndicator: "◉ BROADCAST",
 }
 
-// Dracula is a dark theme inspired by the Dracula color scheme.
-var Dracula = Theme{
+// Nightshade is a dark purple theme with vivid accents.
+var Nightshade = Theme{
 	BorderActive: lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("#BD93F9")),
@@ -84,6 +119,15 @@ var Dracula = Theme{
 	BorderScrollbackFocused: lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("#FFB86C")),
+	BorderResize: lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#8BE9FD")),
+	BorderCopyMode: lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#50FA7B")),
+	BorderCopyModeFocused: lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#69FF94")),
 	Divider: lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#6272A4")),
 	DividerChar: "│",
@@ -97,8 +141,8 @@ var Dracula = Theme{
 	BroadcastIndicator: "◉ BROADCAST",
 }
 
-// Nord is a dark theme inspired by the Nord color scheme.
-var Nord = Theme{
+// Glacier is an arctic blue theme with cool, muted tones.
+var Glacier = Theme{
 	BorderActive: lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("#88C0D0")),
@@ -111,6 +155,15 @@ var Nord = Theme{
 	BorderScrollbackFocused: lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("#D08770")),
+	BorderResize: lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#88C0D0")),
+	BorderCopyMode: lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#A3BE8C")),
+	BorderCopyModeFocused: lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#B3CE9C")),
 	Divider: lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#4C566A")),
 	DividerChar: "│",
@@ -124,8 +177,8 @@ var Nord = Theme{
 	BroadcastIndicator: "◉ BROADCAST",
 }
 
-// Catppuccin is a dark theme inspired by the Catppuccin Mocha color scheme.
-var Catppuccin = Theme{
+// Sorbet is a warm pastel theme with soft lavender and peach tones.
+var Sorbet = Theme{
 	BorderActive: lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("#CBA6F7")),
@@ -138,6 +191,15 @@ var Catppuccin = Theme{
 	BorderScrollbackFocused: lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("#FAB387")),
+	BorderResize: lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#94E2D5")),
+	BorderCopyMode: lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#A6E3A1")),
+	BorderCopyModeFocused: lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#B6F3B1")),
 	Divider: lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#6C7086")),
 	DividerChar: "│",
