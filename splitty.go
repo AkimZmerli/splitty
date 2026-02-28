@@ -697,8 +697,7 @@ func (m *Manager) findPaneAt(x, y int) *Pane {
 
 // translateMouseButton converts a tea.MouseButton and a terminal action constant
 // into the VT button and action values used by the PTY protocol.
-func (m *Manager) translateMouseButton(btn tea.MouseButton, action int) (int, int) {
-	var button int
+func (m *Manager) translateMouseButton(btn tea.MouseButton, action int) (button int, vtAction int) {
 	switch btn {
 	case tea.MouseLeft:
 		button = terminal.MouseButtonLeft
@@ -759,32 +758,34 @@ func (m *Manager) renderNode(n node, width, height int) string {
 func (m *Manager) renderPane(p *Pane, width, height int) string {
 	focused := p.ID == m.focusedID
 	var content string
-	if m.copyMode.Active && m.copyMode.PaneID == p.ID {
+	switch {
+	case m.copyMode.Active && m.copyMode.PaneID == p.ID:
 		highlight := m.getCopyModeHighlight(p)
 		content = p.screen.RenderWithHighlight(highlight)
-	} else if m.selection.Active && m.selection.PaneID == p.ID {
+	case m.selection.Active && m.selection.PaneID == p.ID:
 		content = p.renderWithSelection(&m.selection)
-	} else {
+	default:
 		content = p.screen.RenderWithOptions(nil, focused)
 	}
 	var style lipgloss.Style
 
 	// Copy mode border
-	if m.copyMode.Active && m.copyMode.PaneID == p.ID {
+	switch {
+	case m.copyMode.Active && m.copyMode.PaneID == p.ID:
 		if p.ID == m.focusedID {
 			style = m.theme.BorderCopyModeFocused
 		} else {
 			style = m.theme.BorderCopyMode
 		}
-	} else if m.dragging && m.dragSplit != nil && m.isPaneAdjacentToDrag(p) {
+	case m.dragging && m.dragSplit != nil && m.isPaneAdjacentToDrag(p):
 		style = m.theme.BorderResize
-	} else if p.isScrolledBack() {
+	case p.isScrolledBack():
 		if p.ID == m.focusedID {
 			style = m.theme.BorderScrollbackFocused
 		} else {
 			style = m.theme.BorderScrollback
 		}
-	} else {
+	default:
 		if p.ID == m.focusedID {
 			style = m.theme.BorderActive
 		} else {
