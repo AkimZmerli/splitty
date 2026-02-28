@@ -118,17 +118,17 @@ func NewModel() Model {
 	inputs[0] = textinput.New()
 	inputs[0].Placeholder = "Name"
 	inputs[0].CharLimit = 30
-	inputs[0].Width = 30
+	inputs[0].SetWidth(30)
 
 	inputs[1] = textinput.New()
 	inputs[1].Placeholder = "Email"
 	inputs[1].CharLimit = 50
-	inputs[1].Width = 30
+	inputs[1].SetWidth(30)
 
 	inputs[2] = textinput.New()
 	inputs[2].Placeholder = "Message"
 	inputs[2].CharLimit = 100
-	inputs[2].Width = 30
+	inputs[2].SetWidth(30)
 
 	// Initialize text area
 	ta := textarea.New()
@@ -139,7 +139,7 @@ func NewModel() Model {
 
 	// Initialize progress bar
 	prog := progress.New(
-		progress.WithDefaultGradient(),
+		progress.WithDefaultBlend(),
 		progress.WithWidth(30),
 		progress.WithoutPercentage(),
 	)
@@ -289,8 +289,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case progress.FrameMsg:
 		if m.state == stateProgress {
 			var cmd tea.Cmd
-			model, cmd := m.progress.Update(msg)
-			m.progress = model.(progress.Model)
+			m.progress, cmd = m.progress.Update(msg)
 			return m, cmd
 		}
 	}

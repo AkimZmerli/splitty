@@ -52,11 +52,11 @@ func NewModel() Model {
 		inputs[i] = textinput.New()
 		inputs[i].Placeholder = field.placeholder
 		inputs[i].CharLimit = 100
-		inputs[i].Width = 40
+		inputs[i].SetWidth(40)
 	}
 	inputs[0].Focus()
 
-	vp := viewport.New(80, 15)
+	vp := viewport.New(viewport.WithWidth(80), viewport.WithHeight(15))
 	vp.Style = lipgloss.NewStyle().Padding(1)
 
 	return Model{
@@ -95,8 +95,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		m.reviewport.Width = msg.Width - 4
-		m.reviewport.Height = msg.Height - 10
+		m.reviewport.SetWidth(msg.Width - 4)
+		m.reviewport.SetHeight(msg.Height - 10)
 		return m, nil
 	}
 
@@ -151,10 +151,10 @@ func (m Model) updateReview(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "up", "k":
-			m.reviewport.LineUp(1)
+			m.reviewport.ScrollUp(1)
 			return m, nil
 		case "down", "j":
-			m.reviewport.LineDown(1)
+			m.reviewport.ScrollDown(1)
 			return m, nil
 		case "enter":
 			m.step = stepConfirm

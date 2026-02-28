@@ -27,7 +27,7 @@ func InitialModel() Model {
 	ti := textinput.New()
 	ti.Placeholder = "Enter your name..."
 	ti.CharLimit = 50
-	ti.Width = 30
+	ti.SetWidth(30)
 
 	return Model{
 		step:      0,
@@ -109,7 +109,6 @@ func (m Model) View() tea.View {
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("63"))
 
-	switch m.step {
 	var rendered string
 	switch m.step {
 	case 0:
