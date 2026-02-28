@@ -697,7 +697,7 @@ func (m *Manager) findPaneAt(x, y int) *Pane {
 
 // translateMouseButton converts a tea.MouseButton and a terminal action constant
 // into the VT button and action values used by the PTY protocol.
-func (m *Manager) translateMouseButton(btn tea.MouseButton, action int) (button int, vtAction int) {
+func (m *Manager) translateMouseButton(btn tea.MouseButton, action int) (button, vtAction int) {
 	switch btn {
 	case tea.MouseLeft:
 		button = terminal.MouseButtonLeft
