@@ -1052,9 +1052,10 @@ func (s *Screen) renderInternal(highlight [][]bool, showCursor bool) string {
 			// At viewOffset=V, the visible window starts at (scrollbackLen - V).
 			if s.viewOffset > 0 && s.scrollbackLen > 0 {
 				combinedIdx := (s.scrollbackLen - s.viewOffset) + row
-				if combinedIdx < 0 {
+				switch {
+				case combinedIdx < 0:
 					cell = EmptyCell()
-				} else if combinedIdx < s.scrollbackLen {
+				case combinedIdx < s.scrollbackLen:
 					// This row maps to a scrollback line
 					oldestIdx := (s.scrollbackHead - s.scrollbackLen + s.scrollbackSize) % s.scrollbackSize
 					sbIdx := (oldestIdx + combinedIdx) % s.scrollbackSize
@@ -1063,7 +1064,7 @@ func (s *Screen) renderInternal(highlight [][]bool, showCursor bool) string {
 					} else {
 						cell = EmptyCell()
 					}
-				} else {
+				default:
 					// This row maps to a current cell line
 					cellRow := combinedIdx - s.scrollbackLen
 					if cellRow >= 0 && cellRow < s.height {

@@ -85,11 +85,6 @@ func (p *Pane) close() {
 	}
 }
 
-// render returns the pane's current screen content as an ANSI string.
-func (p *Pane) render() string {
-	return p.screen.Render()
-}
-
 // renderWithSelection renders the pane with selection highlighting.
 func (p *Pane) renderWithSelection(sel *Selection) string {
 	if sel == nil || !sel.Active || sel.PaneID != p.ID {

@@ -167,7 +167,7 @@ func (m *Manager) handleSearchInput(key string, p *Pane) bool {
 		m.copyMode.Searching = false
 		m.executeSearch(p)
 	case "backspace":
-		if len(m.copyMode.SearchBuf) > 0 {
+		if m.copyMode.SearchBuf != "" {
 			m.copyMode.SearchBuf = m.copyMode.SearchBuf[:len(m.copyMode.SearchBuf)-1]
 		}
 	default:

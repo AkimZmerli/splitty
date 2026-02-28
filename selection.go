@@ -43,7 +43,7 @@ func (s *Selection) Contains(row, col int) bool {
 	if s.Mode == SelectLine {
 		return true
 	}
-	if row == sr && row == er {
+	if sr == er {
 		return col >= sc && col <= ec
 	}
 	if row == sr {
